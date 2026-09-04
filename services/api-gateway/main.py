@@ -83,7 +83,7 @@ async def root():
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>CloudTask Platform - Distributed Task Engine</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <style>
@@ -97,29 +97,41 @@ async def root():
       --text-muted: #9CA3AF;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 40px 20px; line-height: 1.6; }
-    .container { max-width: 960px; margin: 0 auto; }
+    body { background-color: var(--bg); color: var(--text); padding: 40px 20px; line-height: 1.6; min-height: 100vh; }
+    .container { max-width: 960px; margin: 0 auto; width: 100%; }
     .header { text-align: center; margin-bottom: 40px; }
     .badge { display: inline-block; background: rgba(59, 130, 246, 0.15); color: #60A5FA; padding: 6px 14px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; margin-bottom: 12px; border: 1px solid rgba(59, 130, 246, 0.3); }
-    h1 { font-size: 2.5rem; font-weight: 800; color: #FFFFFF; margin-bottom: 10px; }
+    h1 { font-size: 2.5rem; font-weight: 800; color: #FFFFFF; margin-bottom: 10px; letter-spacing: -0.02em; }
     .subtitle { color: var(--text-muted); font-size: 1.15rem; max-width: 650px; margin: 0 auto; }
     .status-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); color: #34D399; padding: 6px 16px; border-radius: 9999px; font-size: 0.9rem; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3); margin-top: 20px; }
     .pulse { width: 10px; height: 10px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 10px #10B981; animation: pulse 2s infinite; }
     @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } 100% { opacity: 1; transform: scale(1); } }
     .actions { display: flex; justify-content: center; gap: 16px; margin: 35px 0; flex-wrap: wrap; }
-    .btn { display: inline-flex; align-items: center; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; transition: all 0.2s ease; font-size: 1rem; cursor: pointer; border: none; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; transition: all 0.2s ease; font-size: 1rem; cursor: pointer; border: none; min-height: 48px; touch-action: manipulation; }
     .btn-primary { background: #2563EB; color: #FFFFFF; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); }
     .btn-primary:hover { background: #1D4ED8; transform: translateY(-1px); }
     .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--card-border); }
     .btn-secondary:hover { background: #1F2937; transform: translateY(-1px); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 40px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-top: 40px; }
     .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 24px; }
     .card h3 { color: #FFFFFF; font-size: 1.15rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
     .card p { color: var(--text-muted); font-size: 0.95rem; }
-    .code-box { background: #000000; border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; margin-top: 30px; font-family: monospace; font-size: 0.9rem; color: #A7F3D0; overflow-x: auto; }
-    #health-panel { display: none; background: #0D1527; border: 1px solid #1D4ED8; border-radius: 10px; padding: 20px; margin: 25px auto 0; text-align: left; max-width: 600px; }
+    .code-box { background: #000000; border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; margin-top: 30px; font-family: monospace; font-size: 0.9rem; color: #A7F3D0; overflow-x: auto; word-break: break-all; }
+    #health-panel { display: none; background: #0D1527; border: 1px solid #1D4ED8; border-radius: 10px; padding: 20px; margin: 25px auto 0; text-align: left; max-width: 600px; width: 100%; }
     #health-panel h4 { color: #60A5FA; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
     #health-panel pre { background: #070B14; padding: 12px; border-radius: 6px; color: #34D399; font-size: 0.85rem; overflow-x: auto; margin-top: 10px; }
+
+    @media (max-width: 640px) {
+      body { padding: 24px 14px; }
+      h1 { font-size: 1.85rem; }
+      .subtitle { font-size: 0.95rem; }
+      .actions { flex-direction: column; width: 100%; gap: 10px; }
+      .btn { width: 100%; font-size: 0.95rem; }
+      .grid { grid-template-columns: 1fr; gap: 14px; margin-top: 24px; }
+      .card { padding: 18px; }
+      #health-panel { padding: 14px; }
+      .badge { font-size: 0.75rem; padding: 4px 10px; }
+    }
   </style>
 </head>
 <body>
@@ -231,12 +243,12 @@ async def custom_swagger_ui_html():
     )
     html = response.body.decode("utf-8")
     top_bar = """
-    <div style="background:#0B0F19;border-bottom:1px solid #1F2937;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:99999;font-family:system-ui, -apple-system, sans-serif;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-weight:700;color:#FFFFFF;font-size:1.1rem;letter-spacing:-0.02em;">⚡ CloudTask API Explorer</span>
-        <span style="background:rgba(59,130,246,0.15);color:#60A5FA;padding:3px 10px;border-radius:9999px;font-size:0.75rem;font-weight:600;border:1px solid rgba(59,130,246,0.3);">Swagger UI</span>
+    <div style="background:#0B0F19;border-bottom:1px solid #1F2937;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:99999;font-family:system-ui, -apple-system, sans-serif;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:700;color:#FFFFFF;font-size:0.95rem;letter-spacing:-0.02em;">⚡ CloudTask API Explorer</span>
+        <span style="background:rgba(59,130,246,0.15);color:#60A5FA;padding:2px 8px;border-radius:9999px;font-size:0.7rem;font-weight:600;border:1px solid rgba(59,130,246,0.3);">Swagger UI</span>
       </div>
-      <a href="/" style="background:#2563EB;color:#FFFFFF;text-decoration:none;padding:8px 18px;border-radius:6px;font-weight:600;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(37,99,235,0.4);transition:background 0.2s;">
+      <a href="/" style="background:#2563EB;color:#FFFFFF;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(37,99,235,0.4);transition:background 0.2s;">
         ← Back to Portal
       </a>
     </div>
@@ -251,70 +263,162 @@ async def real_time_dashboard():
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CloudTask - Real-Time Task Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>CloudTask - Enterprise Distributed Task Dashboard</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <style>
     :root {
-      --bg: #0B0F19;
-      --card-bg: #111827;
-      --card-border: #1F2937;
+      --bg: #080C15;
+      --card-bg: #0F172A;
+      --card-inner: #0B1120;
+      --card-border: #1E293B;
+      --card-border-light: #334155;
       --primary: #2563EB;
+      --primary-hover: #1D4ED8;
       --success: #10B981;
       --warning: #F59E0B;
       --danger: #EF4444;
-      --text: #F3F4F6;
-      --text-muted: #9CA3AF;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --radius: 10px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 24px 16px; min-height: 100vh; }
-    .container { max-width: 1280px; margin: 0 auto; }
-    .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 16px; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.25rem; color: #FFFFFF; }
-    .nav-links { display: flex; align-items: center; gap: 12px; }
-    .btn { padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 16px 12px; min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    .container { max-width: 1400px; margin: 0 auto; width: 100%; }
+
+    /* Top Navigation */
+    .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 14px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.15rem; color: #FFFFFF; }
+    .nav-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn { padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; touch-action: manipulation; }
+    .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
     .btn-success { background: var(--success); color: #fff; }
     .btn-danger { background: var(--danger); color: #fff; }
     .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--card-border); }
-    .metrics-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .metric-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 18px; }
-    .metric-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
-    .metric-val { font-size: 1.8rem; font-weight: 800; margin-top: 6px; }
-    .dispatch-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
-    .dispatch-box h3 { font-size: 1.1rem; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    .form-group label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
-    .form-control { background: #070B14; border: 1px solid var(--card-border); border-radius: 6px; padding: 9px 12px; color: #fff; font-size: 0.9rem; }
-    .kanban-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
-    .kanban-col { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; min-height: 420px; }
-    .col-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--card-border); margin-bottom: 14px; font-weight: 700; font-size: 0.95rem; }
-    .task-card { background: #0D1527; border: 1px solid #1E293B; border-radius: 8px; padding: 14px; margin-bottom: 12px; transition: transform 0.2s; }
-    .task-card:hover { transform: translateY(-2px); border-color: #3B82F6; }
-    .task-title { font-weight: 600; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 6px; }
-    .task-meta { font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-    .tag { background: #1E293B; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .btn-secondary:hover { background: #1E293B; }
+
+    /* Cluster Status Banner */
+    .cluster-banner { background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: 8px; padding: 8px 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #93C5FD; flex-wrap: wrap; gap: 8px; }
+    .status-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.18); color: #34D399; padding: 3px 10px; border-radius: 9999px; font-weight: 600; font-size: 0.75rem; }
+    .pulse-dot { width: 8px; height: 8px; background: #10B981; border-radius: 50%; box-shadow: 0 0 8px #10B981; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+    /* Metrics Bar */
+    .metrics-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .metric-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px 16px; transition: transform 0.2s; }
+    .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em; }
+    .metric-val { font-size: 1.7rem; font-weight: 800; margin-top: 4px; line-height: 1.1; }
+
+    /* Filter & Search Toolbar */
+    .filter-toolbar { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .search-box { display: flex; align-items: center; gap: 8px; background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 6px; padding: 6px 12px; flex: 1; min-width: 220px; }
+    .search-box input { background: transparent; border: none; outline: none; color: #fff; font-size: 0.85rem; width: 100%; }
+    .filter-selects { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .filter-select { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 6px; padding: 7px 10px; color: #fff; font-size: 0.82rem; outline: none; cursor: pointer; }
+
+    /* Quick Dispatcher Form */
+    .dispatch-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; transition: all 0.3s ease; }
+    .dispatch-box h3 { font-size: 1rem; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+    .form-control { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 6px; padding: 8px 10px; color: #fff; font-size: 0.85rem; outline: none; }
+    .form-control:focus { border-color: var(--primary); }
+
+    /* Mobile Segmented Control Tabs */
+    .mobile-tabs { display: none; margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; gap: 6px; }
+    .tab-pill { padding: 6px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-muted); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .tab-pill.active { background: #2563EB; color: #fff; border-color: #3B82F6; }
+
+    /* Kanban Grid */
+    .kanban-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: flex-start; }
+    .kanban-col { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; min-height: 380px; }
+    .col-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--card-border); margin-bottom: 12px; font-weight: 700; font-size: 0.88rem; }
+
+    /* Task Card */
+    .task-card { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; margin-bottom: 10px; transition: all 0.2s; cursor: pointer; }
+    .task-card:hover { border-color: #3B82F6; transform: translateY(-1px); }
+    .task-title { font-weight: 600; font-size: 0.88rem; color: #FFFFFF; margin-bottom: 6px; word-break: break-word; }
+    .task-meta { font-size: 0.72rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .tag { background: #1E293B; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; }
     .tag-prio { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
-    .progress-bar { width: 100%; height: 6px; background: #1F2937; border-radius: 9999px; overflow: hidden; margin: 8px 0; }
+    .tag-delay { background: rgba(139, 92, 246, 0.2); color: #A78BFA; }
+    .tag-wh { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+    .progress-bar { width: 100%; height: 5px; background: #1F2937; border-radius: 9999px; overflow: hidden; margin: 6px 0; }
     .progress-fill { height: 100%; background: linear-gradient(90deg, #3B82F6, #10B981); transition: width 0.4s; }
-    .card-actions { display: flex; gap: 8px; margin-top: 10px; }
-    .btn-sm { padding: 4px 10px; font-size: 0.75rem; border-radius: 4px; }
+    .card-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .btn-xs { padding: 4px 8px; font-size: 0.72rem; border-radius: 4px; }
+
+    /* Modal Component (Slide-over/Bottom-sheet on mobile, centered on desktop) */
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 99999; justify-content: center; align-items: center; padding: 12px; }
+    .modal-dialog { background: #0F172A; border: 1px solid #334155; border-radius: 12px; width: 100%; max-width: 720px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.6); animation: modalIn 0.2s ease-out; }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+    .modal-header { padding: 14px 18px; border-bottom: 1px solid #1E293B; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 1.05rem; font-weight: 700; color: #fff; word-break: break-all; }
+    .modal-close { background: transparent; border: none; color: #94A3B8; font-size: 1.3rem; cursor: pointer; padding: 4px 8px; }
+    .modal-body { padding: 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; font-size: 0.85rem; }
+    .modal-footer { padding: 12px 18px; border-top: 1px solid #1E293B; display: flex; justify-content: flex-end; gap: 10px; background: #0B1120; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    .detail-item { background: #0B1120; border: 1px solid #1E293B; border-radius: 6px; padding: 8px 12px; }
+    .detail-label { font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+    .detail-val { font-size: 0.85rem; color: #F1F5F9; word-break: break-all; font-family: monospace; display: flex; align-items: center; justify-content: space-between; }
+    .code-block { background: #050811; border: 1px solid #1E293B; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 0.78rem; color: #A7F3D0; overflow-x: auto; max-height: 180px; }
+    .attempt-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 6px; }
+    .attempt-table th, .attempt-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #1E293B; }
+    .attempt-table th { color: #94A3B8; text-transform: uppercase; font-size: 0.7rem; }
+
+    /* Media Queries for Mobile and Tablet */
+    @media (max-width: 820px) {
+      body { padding: 10px 8px; }
+      .container { max-width: 100%; }
+      .metrics-bar { grid-template-columns: repeat(2, 1fr); }
+      .mobile-tabs { display: flex; }
+      .kanban-grid { grid-template-columns: 1fr; }
+      .kanban-col { min-height: auto; }
+      .kanban-col.mobile-hidden { display: none !important; }
+      .filter-toolbar { flex-direction: column; align-items: stretch; }
+      .search-box { width: 100%; }
+      .filter-selects { width: 100%; justify-content: space-between; }
+      .filter-select { flex: 1; }
+      .modal-backdrop { align-items: flex-end; padding: 0; }
+      .modal-dialog { border-radius: 16px 16px 0 0; max-height: 85vh; }
+      .nav-links .btn { padding: 6px 10px; font-size: 0.78rem; }
+    }
+
+    @media (max-width: 520px) {
+      .metrics-bar { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .metric-card { padding: 10px 12px; }
+      .metric-val { font-size: 1.4rem; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Navbar -->
     <div class="nav">
       <div class="nav-brand">
-        <span>⚡ CloudTask Live Engine</span>
-        <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 3px 8px; border-radius: 9999px;">Cluster Active</span>
+        <span>⚡ CloudTask Engine</span>
+        <div class="status-pill">
+          <div class="pulse-dot"></div>
+          <span>Active</span>
+        </div>
       </div>
       <div class="nav-links">
-        <a href="/" class="btn btn-secondary">← Home Portal</a>
-        <a href="/docs" class="btn btn-secondary">📖 Swagger API</a>
-        <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">📥 Export Audit (CSV)</button>
-        <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">🔄 Refresh</button>
+        <a href="/" class="btn btn-secondary">← Portal</a>
+        <a href="/docs" class="btn btn-secondary">📖 API Docs</a>
+        <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">📥 Export CSV</button>
+        <button onclick="toggleDispatcher()" class="btn btn-primary" id="toggle-dispatch-btn">➕ New Task</button>
+        <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">🔄</button>
       </div>
+    </div>
+
+    <!-- Cluster Fleet Summary Banner -->
+    <div class="cluster-banner">
+      <div><strong>Cluster Nodes:</strong> 2 Distributed Workers Active | <strong>Broker:</strong> RabbitMQ Priority Queue | <strong>Mutex:</strong> Redis Leases</div>
+      <div id="filter-count-badge" style="font-weight:600;">Showing 0 tasks</div>
     </div>
 
     <!-- Metrics Bar -->
@@ -328,11 +432,11 @@ async def real_time_dashboard():
         <div class="metric-val" id="queued-count" style="color: #FBBF24;">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Running in Cluster</div>
+        <div class="metric-label">Running in Fleet</div>
         <div class="metric-val" id="running-count" style="color: #38BDF8;">0</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Successfully Completed</div>
+        <div class="metric-label">Successfully Finished</div>
         <div class="metric-val" id="success-count" style="color: #34D399;">0</div>
       </div>
       <div class="metric-card">
@@ -341,17 +445,44 @@ async def real_time_dashboard():
       </div>
     </div>
 
-    <!-- Quick Dispatcher -->
-    <div class="dispatch-box">
-      <h3>🚀 Dispatch Asynchronous Task to Cluster</h3>
+    <!-- Filter & Search Toolbar -->
+    <div class="filter-toolbar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="task-search" placeholder="Search tasks by title, ID, or trace..." oninput="handleSearch(this.value)" />
+      </div>
+      <div class="filter-selects">
+        <select id="filter-type" class="filter-select" onchange="applyFilters()">
+          <option value="">All Task Types</option>
+          <option value="report_generation">report_generation</option>
+          <option value="data_processing">data_processing</option>
+          <option value="email_dispatch">email_dispatch</option>
+          <option value="system_cleanup">system_cleanup</option>
+        </select>
+        <select id="filter-priority" class="filter-select" onchange="applyFilters()">
+          <option value="">All Priorities</option>
+          <option value="10">Priority 10 (Critical)</option>
+          <option value="8">Priority 8 (High)</option>
+          <option value="5">Priority 5 (Normal)</option>
+          <option value="1">Priority 1 (Low)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Quick Dispatcher Form (Collapsible) -->
+    <div class="dispatch-box" id="dispatch-panel" style="display: none;">
+      <h3>
+        <span>🚀 Dispatch Asynchronous Task to Cluster</span>
+        <button type="button" onclick="toggleDispatcher()" style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:0.9rem;">✕ Close</button>
+      </h3>
       <form id="task-form" onsubmit="handleDispatch(event)">
         <div class="form-grid">
           <div class="form-group">
             <label>Task Title</label>
-            <input type="text" id="task-title" class="form-control" placeholder="e.g. Generate Annual Ledger PDF" required />
+            <input type="text" id="task-title" class="form-control" placeholder="e.g. Ingest Customer Ledger" required />
           </div>
           <div class="form-group">
-            <label>Task Type (Handler)</label>
+            <label>Handler Type</label>
             <select id="task-type" class="form-control">
               <option value="report_generation">report_generation (PDF Export)</option>
               <option value="data_processing">data_processing (ETL Batch)</option>
@@ -360,7 +491,7 @@ async def real_time_dashboard():
             </select>
           </div>
           <div class="form-group">
-            <label>Priority (1 = Low, 10 = Critical)</label>
+            <label>Priority</label>
             <select id="task-priority" class="form-control">
               <option value="10">10 - Critical Priority 🔥</option>
               <option value="8" selected>8 - High Priority ⚡</option>
@@ -369,7 +500,7 @@ async def real_time_dashboard():
             </select>
           </div>
           <div class="form-group">
-            <label>Delay Countdown (Seconds, AWS SQS pattern)</label>
+            <label>Delay Countdown (Seconds)</label>
             <input type="number" id="task-delay" class="form-control" placeholder="0 (Immediate)" min="0" max="86400" value="0" />
           </div>
           <div class="form-group">
@@ -378,53 +509,151 @@ async def real_time_dashboard():
           </div>
           <div class="form-group" style="align-self: flex-end;">
             <button type="submit" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
-              ⚡ Enqueue Task to RabbitMQ
+              ⚡ Enqueue Task
             </button>
           </div>
         </div>
       </form>
     </div>
 
+    <!-- Mobile Segmented Tabs -->
+    <div class="mobile-tabs" id="mobile-tabs">
+      <button class="tab-pill active" onclick="setMobileView('ALL')">All (<span id="m-all">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('QUEUED')">🟡 Queued (<span id="m-queued">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('RUNNING')">🔵 Running (<span id="m-running">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('SUCCESS')">🟢 Success (<span id="m-success">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('DEAD_LETTERED')">🔴 DLQ (<span id="m-dlq">0</span>)</button>
+    </div>
+
     <!-- Kanban Grid -->
     <div class="kanban-grid">
-      <div class="kanban-col">
+      <div class="kanban-col" id="col-container-queued">
         <div class="col-header">
           <span>🟡 QUEUED / PENDING</span>
           <span id="badge-queued" class="tag">0</span>
         </div>
         <div id="col-queued"></div>
       </div>
-      <div class="kanban-col">
+      <div class="kanban-col" id="col-container-running">
         <div class="col-header">
           <span>🔵 RUNNING (Worker)</span>
           <span id="badge-running" class="tag">0</span>
         </div>
         <div id="col-running"></div>
       </div>
-      <div class="kanban-col">
+      <div class="kanban-col" id="col-container-success">
         <div class="col-header">
           <span>🟢 COMPLETED</span>
           <span id="badge-success" class="tag">0</span>
         </div>
         <div id="col-success"></div>
       </div>
-      <div class="kanban-col">
+      <div class="kanban-col" id="col-container-dlq">
         <div class="col-header">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span>🔴 DEAD_LETTERED / FAILED</span>
             <span id="badge-dlq" class="tag">0</span>
           </div>
-          <button onclick="replayAllDLQ()" class="btn btn-danger btn-sm" title="Replay all poisoned tasks back to queue" style="font-size: 0.7rem; padding: 3px 8px;">🔥 Replay All</button>
+          <button onclick="replayAllDLQ()" class="btn btn-danger btn-xs" title="Replay all DLQ tasks" style="padding: 2px 7px;">🔥 Replay All</button>
         </div>
         <div id="col-dlq"></div>
       </div>
     </div>
   </div>
 
+  <!-- Interactive Task Inspection Modal (Temporal / Flower inspired) -->
+  <div class="modal-backdrop" id="task-modal" onclick="handleBackdropClick(event)">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="modal-status-badge" class="tag">STATUS</span>
+          <h3 id="modal-title">Task Inspection</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="closeTaskModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Metadata Grid -->
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Task ID</div>
+            <div class="detail-val">
+              <span id="modal-task-id" style="font-size:0.75rem;">-</span>
+              <button onclick="copyModalField('modal-task-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">📋 Copy</button>
+            </div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Distributed Trace ID</div>
+            <div class="detail-val">
+              <span id="modal-trace-id" style="font-size:0.75rem;">-</span>
+              <button onclick="copyModalField('modal-trace-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">📋 Copy</button>
+            </div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Task Type & Priority</div>
+            <div class="detail-val" id="modal-type-prio">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Scheduled Delay / Webhook</div>
+            <div class="detail-val" id="modal-delay-webhook">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Created Timestamp</div>
+            <div class="detail-val" id="modal-created">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Updated Timestamp</div>
+            <div class="detail-val" id="modal-updated">-</div>
+          </div>
+        </div>
+
+        <!-- Payload viewer -->
+        <div>
+          <div class="detail-label" style="margin-bottom: 4px;">Task Payload JSON</div>
+          <pre class="code-block" id="modal-payload">{}</pre>
+        </div>
+
+        <!-- Result / Error viewer -->
+        <div id="modal-result-section">
+          <div class="detail-label" style="margin-bottom: 4px;">Execution Result / Error Output</div>
+          <pre class="code-block" id="modal-result" style="color: #34D399;">None</pre>
+        </div>
+
+        <!-- Execution Attempts Timeline -->
+        <div>
+          <div class="detail-label" style="margin-bottom: 4px;">Worker Attempt Timeline & Logs</div>
+          <div style="background:#0B1120; border:1px solid #1E293B; border-radius:6px; overflow-x:auto;">
+            <table class="attempt-table">
+              <thead>
+                <tr>
+                  <th>Attempt</th>
+                  <th>Worker ID</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Started At</th>
+                </tr>
+              </thead>
+              <tbody id="modal-attempts-body">
+                <tr><td colspan="5" style="color:#94A3B8; text-align:center;">No attempts recorded yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" id="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let authToken = localStorage.getItem('cloudtask_token') || '';
+    let allTasks = [];
+    let currentSearch = '';
+    let currentTypeFilter = '';
+    let currentPriorityFilter = '';
+    let activeMobileTab = 'ALL';
+    let currentModalTaskId = null;
 
-    // Auto authenticate using demo seed user if no token exists
     async function ensureAuth() {
       if (authToken) return authToken;
       try {
@@ -449,19 +678,82 @@ async def real_time_dashboard():
       if (!token) return;
 
       try {
-        const res = await fetch('/api/v1/tasks?limit=50', {
+        const res = await fetch('/api/v1/tasks?limit=100', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) return;
 
         const data = await res.json();
-        renderTasks(data.tasks || []);
+        allTasks = data.tasks || [];
+        applyFiltersAndRender();
       } catch (err) {
         console.error('Fetch error:', err);
       }
     }
 
-    function renderTasks(tasks) {
+    function toggleDispatcher() {
+      const panel = document.getElementById('dispatch-panel');
+      const btn = document.getElementById('toggle-dispatch-btn');
+      if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        btn.innerText = '➖ Close Form';
+      } else {
+        panel.style.display = 'none';
+        btn.innerText = '➕ New Task';
+      }
+    }
+
+    function handleSearch(val) {
+      currentSearch = val.toLowerCase().trim();
+      applyFiltersAndRender();
+    }
+
+    function applyFilters() {
+      currentTypeFilter = document.getElementById('filter-type').value;
+      currentPriorityFilter = document.getElementById('filter-priority').value;
+      applyFiltersAndRender();
+    }
+
+    function setMobileView(tab) {
+      activeMobileTab = tab;
+      const pills = document.querySelectorAll('.tab-pill');
+      pills.forEach(p => p.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const colMap = {
+        QUEUED: document.getElementById('col-container-queued'),
+        RUNNING: document.getElementById('col-container-running'),
+        SUCCESS: document.getElementById('col-container-success'),
+        DEAD_LETTERED: document.getElementById('col-container-dlq'),
+      };
+
+      if (tab === 'ALL') {
+        Object.values(colMap).forEach(col => col.classList.remove('mobile-hidden'));
+      } else {
+        Object.entries(colMap).forEach(([k, col]) => {
+          if (k === tab) col.classList.remove('mobile-hidden');
+          else col.classList.add('mobile-hidden');
+        });
+      }
+    }
+
+    function applyFiltersAndRender() {
+      const filtered = allTasks.filter(task => {
+        if (currentTypeFilter && task.task_type !== currentTypeFilter) return false;
+        if (currentPriorityFilter && String(task.priority) !== currentPriorityFilter) return false;
+        if (currentSearch) {
+          const matchTitle = (task.title || '').toLowerCase().includes(currentSearch);
+          const matchId = (task.id || '').toLowerCase().includes(currentSearch);
+          const matchTrace = (task.trace_id || '').toLowerCase().includes(currentSearch);
+          if (!matchTitle && !matchId && !matchTrace) return false;
+        }
+        return true;
+      });
+
+      renderColumns(filtered);
+    }
+
+    function renderColumns(tasks) {
       const cols = {
         QUEUED: document.getElementById('col-queued'),
         RUNNING: document.getElementById('col-running'),
@@ -482,6 +774,10 @@ async def real_time_dashboard():
 
         const card = document.createElement('div');
         card.className = 'task-card';
+        card.onclick = (e) => {
+          if (e.target.tagName === 'BUTTON') return;
+          openTaskModal(task.id);
+        };
 
         let progressHtml = '';
         if (status === 'RUNNING') {
@@ -489,32 +785,35 @@ async def real_time_dashboard():
             <div class="progress-bar">
               <div class="progress-fill" style="width: ${Math.max(task.progress || 25, 20)}%;"></div>
             </div>
-            <div style="font-size:0.75rem; color:#38BDF8;">Progress: ${task.progress || 25}%</div>
+            <div style="font-size:0.72rem; color:#38BDF8; font-weight:600;">Executing: ${task.progress || 25}%</div>
           `;
-        }
-
-        let actionHtml = '';
-        if (status === 'QUEUED' || status === 'RUNNING') {
-          actionHtml = `<div class="card-actions"><button onclick="cancelTask('${task.id}')" class="btn btn-danger btn-sm">Cancel Task</button></div>`;
-        } else if (status === 'FAILED' || status === 'DEAD_LETTERED') {
-          actionHtml = `<div class="card-actions"><button onclick="retryTask('${task.id}')" class="btn btn-success btn-sm">Retry Task</button></div>`;
-        }
-
-        let resultPreview = '';
-        if (task.result) {
-          resultPreview = `<pre style="font-size:0.7rem; color:#34D399; margin-top:6px; overflow:hidden; text-overflow:ellipsis;">${JSON.stringify(task.result)}</pre>`;
-        }
-        if (task.error_message) {
-          resultPreview = `<div style="font-size:0.7rem; color:#F87171; margin-top:6px;">${task.error_message}</div>`;
         }
 
         let delayBadge = '';
         if (task.delay_seconds && task.delay_seconds > 0) {
-          delayBadge = `<span class="tag" style="background:rgba(139,92,246,0.2); color:#A78BFA;">⏳ Delay ${task.delay_seconds}s</span>`;
+          delayBadge = `<span class="tag tag-delay">⏳ ${task.delay_seconds}s</span>`;
         }
         let webhookBadge = '';
         if (task.webhook_url) {
-          webhookBadge = `<span class="tag" style="background:rgba(16,185,129,0.2); color:#34D399;" title="${task.webhook_url}">🔗 Webhook</span>`;
+          webhookBadge = `<span class="tag tag-wh" title="${task.webhook_url}">🔗 Hook</span>`;
+        }
+
+        let actionHtml = `
+          <div class="card-actions">
+            <button onclick="openTaskModal('${task.id}')" class="btn btn-secondary btn-xs">🔍 Inspect</button>
+        `;
+        if (status === 'QUEUED' || status === 'RUNNING' || status === 'PENDING') {
+          actionHtml += `<button onclick="cancelTask('${task.id}')" class="btn btn-danger btn-xs">Cancel</button>`;
+        } else if (status === 'FAILED' || status === 'DEAD_LETTERED') {
+          actionHtml += `<button onclick="retryTask('${task.id}')" class="btn btn-success btn-xs">Retry</button>`;
+        }
+        actionHtml += `</div>`;
+
+        let snippet = '';
+        if (task.error_message) {
+          snippet = `<div style="font-size:0.7rem; color:#F87171; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${task.error_message}</div>`;
+        } else if (task.result) {
+          snippet = `<div style="font-size:0.7rem; color:#34D399; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Output: ${JSON.stringify(task.result)}</div>`;
         }
 
         card.innerHTML = `
@@ -527,7 +826,7 @@ async def real_time_dashboard():
             ${webhookBadge}
           </div>
           ${progressHtml}
-          ${resultPreview}
+          ${snippet}
           ${actionHtml}
         `;
 
@@ -537,6 +836,7 @@ async def real_time_dashboard():
         else cols.DEAD_LETTERED.appendChild(card);
       });
 
+      // Update counters
       document.getElementById('total-count').innerText = counts.total;
       document.getElementById('queued-count').innerText = counts.queued;
       document.getElementById('running-count').innerText = counts.running;
@@ -547,6 +847,116 @@ async def real_time_dashboard():
       document.getElementById('badge-running').innerText = counts.running;
       document.getElementById('badge-success').innerText = counts.success;
       document.getElementById('badge-dlq').innerText = counts.dlq;
+
+      document.getElementById('m-all').innerText = counts.total;
+      document.getElementById('m-queued').innerText = counts.queued;
+      document.getElementById('m-running').innerText = counts.running;
+      document.getElementById('m-success').innerText = counts.success;
+      document.getElementById('m-dlq').innerText = counts.dlq;
+
+      document.getElementById('filter-count-badge').innerText = `Showing ${tasks.length} of ${allTasks.length} tasks`;
+    }
+
+    // Modal Inspection Logic
+    function openTaskModal(taskId) {
+      const task = allTasks.find(t => t.id === taskId);
+      if (!task) return;
+      currentModalTaskId = taskId;
+
+      document.getElementById('modal-title').innerText = task.title;
+      document.getElementById('modal-task-id').innerText = task.id;
+      document.getElementById('modal-trace-id').innerText = task.trace_id || 'N/A';
+      document.getElementById('modal-type-prio').innerText = `${task.task_type} (Priority: ${task.priority})`;
+      document.getElementById('modal-delay-webhook').innerText = `Delay: ${task.delay_seconds || 0}s | Webhook: ${task.webhook_url ? 'Configured' : 'None'}`;
+      document.getElementById('modal-created').innerText = new Date(task.created_at).toLocaleString();
+      document.getElementById('modal-updated').innerText = new Date(task.updated_at).toLocaleString();
+
+      const badge = document.getElementById('modal-status-badge');
+      badge.innerText = task.status;
+      if (task.status === 'SUCCESS') badge.className = 'tag tag-wh';
+      else if (task.status === 'RUNNING') badge.className = 'tag';
+      else if (task.status === 'DEAD_LETTERED' || task.status === 'FAILED') badge.className = 'tag tag-prio';
+      else badge.className = 'tag';
+
+      document.getElementById('modal-payload').innerText = JSON.stringify(task.payload || {}, null, 2);
+
+      const resultBox = document.getElementById('modal-result');
+      if (task.error_message) {
+        resultBox.style.color = '#F87171';
+        resultBox.innerText = `Error: ${task.error_message}`;
+      } else if (task.result) {
+        resultBox.style.color = '#34D399';
+        resultBox.innerText = JSON.stringify(task.result, null, 2);
+      } else {
+        resultBox.style.color = '#94A3B8';
+        resultBox.innerText = 'No result output recorded yet.';
+      }
+
+      // Render attempts table
+      const tbody = document.getElementById('modal-attempts-body');
+      tbody.innerHTML = '';
+      if (task.attempts && task.attempts.length > 0) {
+        task.attempts.forEach(att => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><strong>#${att.attempt_number}</strong></td>
+            <td><code>${att.worker_id}</code></td>
+            <td>${att.duration_ms ? att.duration_ms + 'ms' : '-'}</td>
+            <td><span class="tag">${att.status}</span></td>
+            <td>${new Date(att.started_at).toLocaleTimeString()}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:#94A3B8; text-align:center;">No worker attempts recorded yet</td></tr>';
+      }
+
+      // Modal action buttons
+      const actionContainer = document.getElementById('modal-actions');
+      actionContainer.innerHTML = '';
+      if (task.status === 'QUEUED' || task.status === 'RUNNING' || task.status === 'PENDING') {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-danger';
+        cancelBtn.innerText = 'Cancel Task';
+        cancelBtn.onclick = () => { cancelTask(task.id); closeTaskModal(); };
+        actionContainer.appendChild(cancelBtn);
+      } else if (task.status === 'FAILED' || task.status === 'DEAD_LETTERED') {
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'btn btn-success';
+        retryBtn.innerText = 'Retry Task';
+        retryBtn.onclick = () => { retryTask(task.id); closeTaskModal(); };
+        actionContainer.appendChild(retryBtn);
+      }
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'btn btn-secondary';
+      closeBtn.innerText = 'Close';
+      closeBtn.onclick = closeTaskModal;
+      actionContainer.appendChild(closeBtn);
+
+      document.getElementById('task-modal').style.display = 'flex';
+    }
+
+    function closeTaskModal() {
+      document.getElementById('task-modal').style.display = 'none';
+      currentModalTaskId = null;
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target.id === 'task-modal') closeTaskModal();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeTaskModal();
+    });
+
+    function copyModalField(elementId, btn) {
+      const text = document.getElementById(elementId).innerText;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+        btn.innerText = '✅ Copied';
+        setTimeout(() => btn.innerText = '📋 Copy', 1500);
+      }
     }
 
     async function handleDispatch(e) {
@@ -582,18 +992,18 @@ async def real_time_dashboard():
           document.getElementById('task-title').value = '';
           document.getElementById('task-webhook').value = '';
           document.getElementById('task-delay').value = '0';
-          btn.innerText = '✅ Dispatched!';
-          setTimeout(() => btn.innerText = '⚡ Enqueue Task to RabbitMQ', 1500);
+          btn.innerText = '✅ Enqueued!';
+          setTimeout(() => btn.innerText = '⚡ Enqueue Task', 1500);
           fetchTasks();
         }
       } catch (err) {
         alert('Dispatch error: ' + err.message);
-        btn.innerText = '⚡ Enqueue Task to RabbitMQ';
+        btn.innerText = '⚡ Enqueue Task';
       }
     }
 
     async function replayAllDLQ() {
-      if (!confirm('Replay all dead-lettered / failed tasks back into active queue?')) return;
+      if (!confirm('Replay all dead-lettered tasks back into the active queue?')) return;
       const token = await ensureAuth();
       try {
         const res = await fetch('/api/v1/tasks/dlq/replay-all', {
@@ -628,13 +1038,13 @@ async def real_time_dashboard():
           btn.innerText = '✅ Exported!';
         } else {
           alert('Export failed');
-          btn.innerText = '📥 Export Audit (CSV)';
+          btn.innerText = '📥 Export CSV';
         }
       } catch (err) {
         alert('Export error: ' + err.message);
-        btn.innerText = '📥 Export Audit (CSV)';
+        btn.innerText = '📥 Export CSV';
       }
-      setTimeout(() => btn.innerText = '📥 Export Audit (CSV)', 2000);
+      setTimeout(() => btn.innerText = '📥 Export CSV', 2000);
     }
 
     async function cancelTask(taskId) {
@@ -655,7 +1065,7 @@ async def real_time_dashboard():
       fetchTasks();
     }
 
-    // Initial fetch and 2-second live polling loop
+    // Initial fetch and 2.5-second live polling loop
     fetchTasks();
     setInterval(fetchTasks, 2500);
   </script>
