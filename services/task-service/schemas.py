@@ -15,6 +15,8 @@ class CreateTaskRequest(BaseModel):
     timeout_seconds: int = Field(default=300, ge=1, le=3600)
     depends_on: List[str] = Field(default_factory=list, description="List of prerequisite task IDs (DAG execution)")
     idempotency_key: Optional[str] = Field(default=None, max_length=255)
+    webhook_url: Optional[str] = Field(default=None, max_length=1000, description="HMAC-signed webhook callback URL upon completion or failure")
+    delay_seconds: Optional[int] = Field(default=0, ge=0, le=86400, description="Delay execution countdown in seconds (AWS SQS pattern)")
 
 
 class TaskAttemptResponse(BaseModel):
@@ -48,6 +50,8 @@ class TaskResponse(BaseModel):
     depends_on: List[str] = []
     trace_id: Optional[str] = None
     idempotency_key: Optional[str] = None
+    webhook_url: Optional[str] = None
+    delay_seconds: Optional[int] = 0
     result: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     scheduled_at: Optional[datetime] = None
@@ -61,3 +65,26 @@ class TaskListResponse(BaseModel):
     page: int
     limit: int
     tasks: List[TaskResponse]
+
+
+class BatchCreateTasksRequest(BaseModel):
+    tasks: List[CreateTaskRequest] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Batch list of tasks (max 100 per request, AWS SQS pattern)"
+    )
+
+
+class BatchTaskResponse(BaseModel):
+    total_submitted: int
+    successful_count: int
+    failed_count: int
+    tasks: List[TaskResponse]
+    errors: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class DLQReplayResponse(BaseModel):
+    replayed_count: int
+    message: str
+    task_ids: List[str]

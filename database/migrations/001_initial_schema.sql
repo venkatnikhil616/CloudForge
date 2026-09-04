@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     result JSONB,
     error_message VARCHAR(2000),
     scheduled_at TIMESTAMP WITH TIME ZONE,
+    webhook_url VARCHAR(1000),
+    delay_seconds INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

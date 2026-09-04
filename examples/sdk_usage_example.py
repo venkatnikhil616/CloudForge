@@ -31,4 +31,22 @@ promise_b = client.submit_task(
 )
 print(f"Dependent Task B queued (waiting on Task A): {promise_b.task_id}")
 
+print("\n=== 3. High-Throughput Batch Task Ingestion (AWS SQS Pattern) ===")
+batch_result = client.submit_batch([
+    {
+        "title": f"Batch ETL Job #{i}",
+        "task_type": "data_processing",
+        "payload": {"batch_id": i, "records": 500},
+        "priority": 7,
+        "delay_seconds": 10 if i % 2 == 0 else 0,
+        "webhook_url": "https://api.enterprise.com/hooks/task-completion",
+    }
+    for i in range(1, 4)
+])
+print(f"Batch dispatched: {batch_result['successful_count']}/{batch_result['total_submitted']} tasks queued")
+
+print("\n=== 4. Compliance & Audit Export (SOC2 / ISO27001) ===")
+csv_bytes = client.export_audit(format="csv")
+print(f"Exported audit log CSV ({len(csv_bytes)} bytes)")
+
 print("\nSDK workflow submission verified!")

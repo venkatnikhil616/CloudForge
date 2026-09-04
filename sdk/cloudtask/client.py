@@ -65,6 +65,8 @@ class CloudTaskClient:
         max_retries: int = 4,
         depends_on: Optional[List[str]] = None,
         idempotency_key: Optional[str] = None,
+        webhook_url: Optional[str] = None,
+        delay_seconds: Optional[int] = 0,
     ) -> TaskPromise:
         """Enqueues an asynchronous task to the CloudTask cluster."""
         body = {
@@ -75,11 +77,31 @@ class CloudTaskClient:
             "max_retries": max_retries,
             "depends_on": depends_on or [],
             "idempotency_key": idempotency_key,
+            "webhook_url": webhook_url,
+            "delay_seconds": delay_seconds or 0,
         }
         resp = self._http.post("/api/v1/tasks", json=body, headers=self._headers())
         resp.raise_for_status()
         task_id = resp.json()["id"]
         return TaskPromise(self, task_id)
+
+    def submit_batch(self, tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """AWS SQS-style Batch Task Ingestion: Submits up to 100 tasks in a single request."""
+        resp = self._http.post("/api/v1/tasks/batch", json={"tasks": tasks}, headers=self._headers())
+        resp.raise_for_status()
+        return resp.json()
+
+    def replay_dlq(self) -> Dict[str, Any]:
+        """AWS SQS Dead-Letter Queue Redrive: Replays all failed or dead-lettered tasks."""
+        resp = self._http.post("/api/v1/tasks/dlq/replay-all", headers=self._headers())
+        resp.raise_for_status()
+        return resp.json()
+
+    def export_audit(self, format: str = "csv") -> bytes:
+        """Downloads RFC 4180 CSV or JSON audit records of task execution history."""
+        resp = self._http.get(f"/api/v1/tasks/export?format={format}", headers=self._headers())
+        resp.raise_for_status()
+        return resp.content
 
     def get_task(self, task_id: str) -> Dict[str, Any]:
         """Fetches status, progress, and result of a task."""

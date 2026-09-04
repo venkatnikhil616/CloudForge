@@ -312,6 +312,7 @@ async def real_time_dashboard():
       <div class="nav-links">
         <a href="/" class="btn btn-secondary">← Home Portal</a>
         <a href="/docs" class="btn btn-secondary">📖 Swagger API</a>
+        <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">📥 Export Audit (CSV)</button>
         <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">🔄 Refresh</button>
       </div>
     </div>
@@ -367,6 +368,14 @@ async def real_time_dashboard():
               <option value="1">1 - Low Priority</option>
             </select>
           </div>
+          <div class="form-group">
+            <label>Delay Countdown (Seconds, AWS SQS pattern)</label>
+            <input type="number" id="task-delay" class="form-control" placeholder="0 (Immediate)" min="0" max="86400" value="0" />
+          </div>
+          <div class="form-group">
+            <label>Webhook Callback URL (HMAC Signed)</label>
+            <input type="url" id="task-webhook" class="form-control" placeholder="https://api.example.com/webhook (Optional)" />
+          </div>
           <div class="form-group" style="align-self: flex-end;">
             <button type="submit" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
               ⚡ Enqueue Task to RabbitMQ
@@ -380,7 +389,7 @@ async def real_time_dashboard():
     <div class="kanban-grid">
       <div class="kanban-col">
         <div class="col-header">
-          <span>🟡 QUEUED</span>
+          <span>🟡 QUEUED / PENDING</span>
           <span id="badge-queued" class="tag">0</span>
         </div>
         <div id="col-queued"></div>
@@ -401,8 +410,11 @@ async def real_time_dashboard():
       </div>
       <div class="kanban-col">
         <div class="col-header">
-          <span>🔴 DEAD_LETTERED / FAILED</span>
-          <span id="badge-dlq" class="tag">0</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>🔴 DEAD_LETTERED / FAILED</span>
+            <span id="badge-dlq" class="tag">0</span>
+          </div>
+          <button onclick="replayAllDLQ()" class="btn btn-danger btn-sm" title="Replay all poisoned tasks back to queue" style="font-size: 0.7rem; padding: 3px 8px;">🔥 Replay All</button>
         </div>
         <div id="col-dlq"></div>
       </div>
@@ -496,12 +508,23 @@ async def real_time_dashboard():
           resultPreview = `<div style="font-size:0.7rem; color:#F87171; margin-top:6px;">${task.error_message}</div>`;
         }
 
+        let delayBadge = '';
+        if (task.delay_seconds && task.delay_seconds > 0) {
+          delayBadge = `<span class="tag" style="background:rgba(139,92,246,0.2); color:#A78BFA;">⏳ Delay ${task.delay_seconds}s</span>`;
+        }
+        let webhookBadge = '';
+        if (task.webhook_url) {
+          webhookBadge = `<span class="tag" style="background:rgba(16,185,129,0.2); color:#34D399;" title="${task.webhook_url}">🔗 Webhook</span>`;
+        }
+
         card.innerHTML = `
           <div class="task-title">${task.title}</div>
           <div class="task-meta">
             <span class="tag tag-prio">Prio ${task.priority}</span>
             <span class="tag">${task.task_type}</span>
             <span class="tag">Att: ${task.current_attempt}/${task.max_retries}</span>
+            ${delayBadge}
+            ${webhookBadge}
           </div>
           ${progressHtml}
           ${resultPreview}
@@ -532,25 +555,33 @@ async def real_time_dashboard():
       const title = document.getElementById('task-title').value;
       const task_type = document.getElementById('task-type').value;
       const priority = parseInt(document.getElementById('task-priority').value, 10);
+      const delay = parseInt(document.getElementById('task-delay').value, 10) || 0;
+      const webhook = document.getElementById('task-webhook').value.trim() || null;
       const btn = document.getElementById('submit-btn');
 
       btn.innerText = '⏳ Dispatching...';
       try {
+        const payloadBody = {
+          title: title,
+          task_type: task_type,
+          priority: priority,
+          delay_seconds: delay,
+          payload: { timestamp: Date.now() }
+        };
+        if (webhook) payloadBody.webhook_url = webhook;
+
         const res = await fetch('/api/v1/tasks', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({
-            title: title,
-            task_type: task_type,
-            priority: priority,
-            payload: { timestamp: Date.now() }
-          })
+          body: JSON.stringify(payloadBody)
         });
         if (res.ok) {
           document.getElementById('task-title').value = '';
+          document.getElementById('task-webhook').value = '';
+          document.getElementById('task-delay').value = '0';
           btn.innerText = '✅ Dispatched!';
           setTimeout(() => btn.innerText = '⚡ Enqueue Task to RabbitMQ', 1500);
           fetchTasks();
@@ -559,6 +590,51 @@ async def real_time_dashboard():
         alert('Dispatch error: ' + err.message);
         btn.innerText = '⚡ Enqueue Task to RabbitMQ';
       }
+    }
+
+    async function replayAllDLQ() {
+      if (!confirm('Replay all dead-lettered / failed tasks back into active queue?')) return;
+      const token = await ensureAuth();
+      try {
+        const res = await fetch('/api/v1/tasks/dlq/replay-all', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        alert(data.message || 'DLQ tasks replayed');
+        fetchTasks();
+      } catch (err) {
+        alert('DLQ Replay error: ' + err.message);
+      }
+    }
+
+    async function exportTasksCsv() {
+      const token = await ensureAuth();
+      const btn = document.getElementById('export-btn');
+      btn.innerText = '⏳ Exporting...';
+      try {
+        const res = await fetch('/api/v1/tasks/export?format=csv', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `cloudtask_audit_${Date.now()}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          btn.innerText = '✅ Exported!';
+        } else {
+          alert('Export failed');
+          btn.innerText = '📥 Export Audit (CSV)';
+        }
+      } catch (err) {
+        alert('Export error: ' + err.message);
+        btn.innerText = '📥 Export Audit (CSV)';
+      }
+      setTimeout(() => btn.innerText = '📥 Export Audit (CSV)', 2000);
     }
 
     async function cancelTask(taskId) {

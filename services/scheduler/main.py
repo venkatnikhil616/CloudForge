@@ -105,6 +105,50 @@ async def process_due_schedules():
                 logger.info(f"Published scheduled task {task_id} for schedule '{schedule.title}'")
 
 
+async def process_delayed_tasks():
+    """Polls database for delayed tasks whose countdown has elapsed and enqueues them."""
+    now = datetime.now(timezone.utc)
+    async with AsyncSessionLocal() as db:
+        stmt = select(Task).where(
+            Task.status == TaskStatus.PENDING,
+            Task.scheduled_at.is_not(None),
+            Task.scheduled_at <= now,
+        )
+        due_tasks = (await db.execute(stmt)).scalars().all()
+        if not due_tasks:
+            return
+
+        mq_client = await get_rabbitmq_client()
+        for task in due_tasks:
+            async with distributed_lock(f"task:delay:{task.id}", timeout_seconds=15) as lock_acquired:
+                if not lock_acquired:
+                    continue
+
+                task.status = TaskStatus.QUEUED
+                await db.commit()
+
+                task_message = {
+                    "id": task.id,
+                    "user_id": task.user_id,
+                    "title": task.title,
+                    "task_type": task.task_type,
+                    "payload": task.payload,
+                    "priority": task.priority,
+                    "max_retries": task.max_retries,
+                    "current_attempt": task.current_attempt,
+                    "timeout_seconds": task.timeout_seconds,
+                    "trace_id": task.trace_id,
+                    "webhook_url": task.webhook_url,
+                    "delay_seconds": task.delay_seconds,
+                }
+                await mq_client.publish_task(
+                    task_payload=task_message,
+                    priority=task.priority,
+                    routing_key="task.created",
+                )
+                logger.info(f"Delayed Task: Released task {task.id} to queue after scheduled countdown expired.")
+
+
 async def run_scheduler():
     global running
     logger.info("Starting CloudTask Distributed Scheduler...")
@@ -116,6 +160,7 @@ async def run_scheduler():
                 if is_leader:
                     SCHEDULER_LEADER_STATUS.set(1)
                     await process_due_schedules()
+                    await process_delayed_tasks()
                 else:
                     SCHEDULER_LEADER_STATUS.set(0)
         except Exception as e:

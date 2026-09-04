@@ -1,9 +1,13 @@
 import asyncio
+import hashlib
+import hmac
 import json
 import signal
+import time
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from aio_pika.abc import AbstractIncomingMessage
 from prometheus_client import Counter, start_http_server
 
@@ -27,11 +31,12 @@ def handle_shutdown(signum, frame):
 
 
 async def handle_notification(event_type: str, data: dict):
-    """Processes task event and dispatches mock email/system notification."""
+    """Processes task event, dispatches mock email, and triggers HMAC-signed webhook callbacks."""
     task_id = data.get("task_id")
     user_id = data.get("user_id", "system")
     title = data.get("title", "Task")
     status = data.get("status", "UNKNOWN")
+    webhook_url = data.get("webhook_url")
 
     if status == "SUCCESS":
         subject = f"✅ Task Completed: {title}"
@@ -43,9 +48,9 @@ async def handle_notification(event_type: str, data: dict):
         subject = f"ℹ️ CloudTask Update: {title}"
         body = f"Task '{title}' (ID: {task_id}) changed state to {status}."
 
-    logger.info(f"[DISPATCH NOTIFICATION] Subject: {subject} | Recipient: user-{user_id}@cloudtask.dev")
+    logger.info(f"[DISPATCH EMAIL] Subject: {subject} | Recipient: user-{user_id}@cloudtask.dev")
 
-    # Persist log to PostgreSQL
+    # 1. Persist mock email log
     async with AsyncSessionLocal() as db:
         record = NotificationLog(
             id=str(uuid.uuid4()),
@@ -62,6 +67,70 @@ async def handle_notification(event_type: str, data: dict):
         await db.commit()
 
     NOTIFICATIONS_SENT.labels(channel="email", status="SENT").inc()
+
+    # 2. Outgoing Webhook Callback with HMAC-SHA256 Signature (Stripe/GitHub style)
+    if webhook_url:
+        webhook_payload = {
+            "event": event_type,
+            "task_id": task_id,
+            "user_id": user_id,
+            "title": title,
+            "status": status,
+            "duration_ms": data.get("duration_ms"),
+            "trace_id": data.get("trace_id"),
+            "result": data.get("result"),
+            "error": data.get("error"),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        timestamp_epoch = int(time.time())
+        payload_bytes = json.dumps(webhook_payload, sort_keys=True).encode("utf-8")
+        secret = settings.JWT_SECRET_KEY
+        to_sign = f"{timestamp_epoch}.".encode("utf-8") + payload_bytes
+        signature = hmac.new(secret.encode("utf-8"), to_sign, hashlib.sha256).hexdigest()
+
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "CloudTask-Webhook-Dispatcher/1.0",
+            "X-CloudTask-Event": event_type,
+            "X-CloudTask-Delivery": str(uuid.uuid4()),
+            "X-CloudTask-Timestamp": str(timestamp_epoch),
+            "X-CloudTask-Signature": f"t={timestamp_epoch},v1={signature}",
+        }
+
+        webhook_status = "DELIVERED"
+        webhook_msg = "HTTP 200 OK"
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(webhook_url, content=payload_bytes, headers=headers)
+                if resp.status_code >= 400:
+                    webhook_status = "FAILED"
+                    webhook_msg = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                else:
+                    webhook_msg = f"HTTP {resp.status_code}"
+        except Exception as exc:
+            webhook_status = "FAILED"
+            webhook_msg = f"Delivery connection error: {exc}"
+
+        logger.info(f"[DISPATCH WEBHOOK] Target: {webhook_url} | Status: {webhook_status} ({webhook_msg})")
+
+        async with AsyncSessionLocal() as db:
+            wh_log = NotificationLog(
+                id=str(uuid.uuid4()),
+                user_id=str(user_id),
+                task_id=task_id,
+                event_type=event_type,
+                channel="webhook",
+                recipient=webhook_url,
+                status=webhook_status,
+                message=f"Webhook delivery to {webhook_url} ({webhook_status}): {webhook_msg}",
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(wh_log)
+            await db.commit()
+
+        NOTIFICATIONS_SENT.labels(channel="webhook", status=webhook_status).inc()
 
 
 async def on_notification_message(message: AbstractIncomingMessage):

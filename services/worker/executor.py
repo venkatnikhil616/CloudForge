@@ -230,6 +230,8 @@ async def execute_task(task_payload: Dict[str, Any]) -> Tuple[bool, bool]:
                     "status": "SUCCESS",
                     "duration_ms": duration_ms,
                     "trace_id": trace_id,
+                    "webhook_url": task.webhook_url,
+                    "result": task.result,
                 })
                 logger.info(f"Task {task.id} succeeded in {duration_ms}ms (Trace: {trace_id})")
                 return True, False
@@ -270,5 +272,6 @@ async def execute_task(task_payload: Dict[str, Any]) -> Tuple[bool, bool]:
                         "status": "DEAD_LETTERED",
                         "error": task.error_message,
                         "trace_id": trace_id,
+                        "webhook_url": task.webhook_url,
                     })
                     return False, False

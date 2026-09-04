@@ -45,6 +45,8 @@ class Task(Base):
     result: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    webhook_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    delay_seconds: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
