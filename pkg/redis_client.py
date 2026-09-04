@@ -45,52 +45,68 @@ async def distributed_lock(
     Acquires a distributed lock using Redis SETNX with expiration.
     Ensures safe idempotent task and scheduler execution.
     """
-    client = get_redis_client()
-    key = f"lock:{lock_key}"
-    acquired = False
-
-    for _ in range(max_retries):
-        # SET key 1 NX EX timeout
-        if await client.set(key, "1", nx=True, ex=timeout_seconds):
-            acquired = True
-            break
-        await asyncio.sleep(retry_interval)
-
-    if not acquired:
-        yield False
-        return
-
     try:
-        yield True
-    finally:
+        client = get_redis_client()
+        key = f"lock:{lock_key}"
+        acquired = False
+
+        for _ in range(max_retries):
+            # SET key 1 NX EX timeout
+            if await client.set(key, "1", nx=True, ex=timeout_seconds):
+                acquired = True
+                break
+            await asyncio.sleep(retry_interval)
+
+        if not acquired:
+            yield False
+            return
+
         try:
-            await client.delete(key)
-        except Exception as e:
-            logger.warning(f"Error releasing lock {key}: {e}")
+            yield True
+        finally:
+            try:
+                await client.delete(key)
+            except Exception as e:
+                logger.warning(f"Error releasing lock {key}: {e}")
+    except Exception as e:
+        logger.warning(f"Redis distributed lock unavailable: {e}. Falling back to single-node grant.")
+        yield True
 
 
 async def check_idempotency(key: str) -> Optional[str]:
     """Retrieves saved execution result or status for an idempotency key."""
-    client = get_redis_client()
-    return await client.get(f"idempotency:{key}")
+    try:
+        client = get_redis_client()
+        return await client.get(f"idempotency:{key}")
+    except Exception as e:
+        logger.warning(f"Redis idempotency check bypassed: {e}")
+        return None
 
 
 async def store_idempotency(key: str, value: str, ttl_seconds: int = 86400) -> bool:
     """Stores execution state for an idempotency key with TTL."""
-    client = get_redis_client()
-    return bool(await client.set(f"idempotency:{key}", value, ex=ttl_seconds))
+    try:
+        client = get_redis_client()
+        return bool(await client.set(f"idempotency:{key}", value, ex=ttl_seconds))
+    except Exception as e:
+        logger.warning(f"Redis store idempotency bypassed: {e}")
+        return False
 
 
 async def check_rate_limit(key: str, limit: int = 100, window_seconds: int = 60) -> bool:
     """
     Simple sliding window rate limiter. Returns True if within limit, False if rate-limited.
     """
-    client = get_redis_client()
-    rate_key = f"rate_limit:{key}"
-    current = await client.incr(rate_key)
-    if current == 1:
-        await client.expire(rate_key, window_seconds)
-    return current <= limit
+    try:
+        client = get_redis_client()
+        rate_key = f"rate_limit:{key}"
+        current = await client.incr(rate_key)
+        if current == 1:
+            await client.expire(rate_key, window_seconds)
+        return current <= limit
+    except Exception as e:
+        logger.warning(f"Redis rate limiter bypassed: {e}")
+        return True
 
 
 async def check_redis_health() -> bool:

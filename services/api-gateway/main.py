@@ -44,9 +44,56 @@ http_client: httpx.AsyncClient = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global http_client
-    logger.info("Initializing API Gateway reverse proxy client...")
+    logger.info("Initializing API Gateway client...")
     http_client = httpx.AsyncClient(timeout=30.0)
+
+    # Automatically initialize database schema and seed default admin user on startup
+    try:
+        from sqlalchemy import select
+
+        from pkg.database import AsyncSessionLocal, Base, engine
+        from pkg.models import User
+        from pkg.security import hash_password
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        async with AsyncSessionLocal() as session:
+            stmt = select(User).where(User.email == "admin@cloudtask.dev")
+            existing = (await session.execute(stmt)).scalar_one_or_none()
+            if not existing:
+                admin_user = User(
+                    id=str(uuid.uuid4()),
+                    email="admin@cloudtask.dev",
+                    hashed_password=hash_password("AdminSecurePass123!"),
+                    full_name="CloudTask Admin",
+                    role="admin",
+                    is_active=True,
+                )
+                session.add(admin_user)
+                await session.commit()
+                logger.info("Auto-initialized database and seeded admin user.")
+    except Exception as e:
+        logger.warning(f"Database auto-setup: {e}")
+
+    worker_task = None
+
+    async def gateway_worker_loop():
+        try:
+            from services.worker.main import poll_and_execute_tasks
+            while True:
+                await asyncio.sleep(2)
+                await poll_and_execute_tasks()
+        except asyncio.CancelledError:
+            pass
+        except Exception as err:
+            logger.warning(f"Gateway worker background loop: {err}")
+
+    worker_task = asyncio.create_task(gateway_worker_loop())
+
     yield
+    if worker_task:
+        worker_task.cancel()
     if http_client:
         await http_client.aclose()
     logger.info("API Gateway shut down.")
@@ -57,7 +104,7 @@ app = FastAPI(
     version="1.0.0",
     description="Unified API Gateway with rate limiting, correlation tracking, and security enforcement",
     lifespan=lifespan,
-    docs_url=None,
+    docs_url="/docs",
 )
 
 
@@ -1217,21 +1264,30 @@ async def proxy_request(service_name: str, target_base_url: str, request: Reques
     )
 
 
-# Auth Service Proxy Routes (/api/v1/auth/...)
-@app.api_route("/api/v1/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def auth_proxy(path: str, request: Request):
-    return await proxy_request("auth-service", f"{AUTH_SERVICE_URL}/auth", request, path)
+# In-process routers (with fallback to reverse proxy)
+try:
+    import services.auth_service.routes as auth_routes
+    import services.task_service.routes as task_routes
 
+    app.include_router(auth_routes.router, prefix="/api/v1")
+    app.include_router(task_routes.router, prefix="/api/v1")
+    logger.info("Direct in-process Auth and Task routers registered successfully.")
+except Exception as e:
+    logger.warning(f"Could not load in-process routers ({e}). Using reverse proxy routes.")
 
-# Task Service Proxy Routes (/api/v1/tasks/...)
-@app.api_route("/api/v1/tasks/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def task_proxy(path: str, request: Request):
-    return await proxy_request("task-service", f"{TASK_SERVICE_URL}/tasks", request, path)
+    # Auth Service Proxy Routes (/api/v1/auth/...)
+    @app.api_route("/api/v1/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    async def auth_proxy(path: str, request: Request):
+        return await proxy_request("auth-service", f"{AUTH_SERVICE_URL}/auth", request, path)
 
+    # Task Service Proxy Routes (/api/v1/tasks/...)
+    @app.api_route("/api/v1/tasks/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    async def task_proxy(path: str, request: Request):
+        return await proxy_request("task-service", f"{TASK_SERVICE_URL}/tasks", request, path)
 
-@app.api_route("/api/v1/tasks", methods=["GET", "POST"])
-async def task_root_proxy(request: Request):
-    return await proxy_request("task-service", f"{TASK_SERVICE_URL}/tasks", request, "")
+    @app.api_route("/api/v1/tasks", methods=["GET", "POST"])
+    async def task_root_proxy(request: Request):
+        return await proxy_request("task-service", f"{TASK_SERVICE_URL}/tasks", request, "")
 
 
 if __name__ == "__main__":
