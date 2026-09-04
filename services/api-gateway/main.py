@@ -1200,11 +1200,10 @@ async def real_time_dashboard():
 </body>
 </html>"""
 
-
 # Health and Metrics
 @app.get("/health/live", tags=["Health"])
 async def liveness():
-    return {"status": "UP", "service": "api-gateway"}
+    return {"status": "UP", "service": "api-gateway", "version": "1.1.0"}
 
 
 @app.get("/health/ready", tags=["Health"])
@@ -1221,9 +1220,11 @@ async def metrics():
 
 
 # Proxy helper
-async def proxy_request(service_name: str, target_base_url: str, request: Request, path: str):
+async def proxy_request(service_name: str, target_base_url: str, request: Request, subpath: str = ""):
     start_time = time.time()
-    url = f"{target_base_url}/{path}"
+    clean_subpath = subpath.lstrip("/")
+    url = f"{target_base_url}/{clean_subpath}" if clean_subpath else target_base_url
+
     if request.url.query:
         url = f"{url}?{request.url.query}"
 
@@ -1265,21 +1266,39 @@ async def proxy_request(service_name: str, target_base_url: str, request: Reques
 
 
 # In-process routers (with fallback to reverse proxy)
+auth_loaded = False
 try:
-    import services.auth_service.routes as auth_routes
-    import services.task_service.routes as task_routes
-
+    import importlib
+    try:
+        auth_routes = importlib.import_module("services.auth-service.routes")
+    except Exception:
+        import services.auth_service.routes as auth_routes
     app.include_router(auth_routes.router, prefix="/api/v1")
-    app.include_router(task_routes.router, prefix="/api/v1")
-    logger.info("Direct in-process Auth and Task routers registered successfully.")
+    auth_loaded = True
+    logger.info("Direct in-process Auth router registered successfully.")
 except Exception as e:
-    logger.warning(f"Could not load in-process routers ({e}). Using reverse proxy routes.")
+    logger.warning(f"Could not load in-process Auth router ({e}). Using reverse proxy routes.")
 
+task_loaded = False
+try:
+    import importlib
+    try:
+        task_routes = importlib.import_module("services.task-service.routes")
+    except Exception:
+        import services.task_service.routes as task_routes
+    app.include_router(task_routes.router, prefix="/api/v1")
+    task_loaded = True
+    logger.info("Direct in-process Task router registered successfully.")
+except Exception as e:
+    logger.warning(f"Could not load in-process Task router ({e}). Using reverse proxy routes.")
+
+if not auth_loaded:
     # Auth Service Proxy Routes (/api/v1/auth/...)
     @app.api_route("/api/v1/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
     async def auth_proxy(path: str, request: Request):
         return await proxy_request("auth-service", f"{AUTH_SERVICE_URL}/auth", request, path)
 
+if not task_loaded:
     # Task Service Proxy Routes (/api/v1/tasks/...)
     @app.api_route("/api/v1/tasks/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
     async def task_proxy(path: str, request: Request):
