@@ -1,13 +1,14 @@
 import time
 import uuid
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from pkg.config import get_settings
-from pkg.logger import get_logger, set_correlation_id
 from pkg.database import check_database_health
+from pkg.logger import get_logger, set_correlation_id
 
 try:
     from .routes import router as auth_router

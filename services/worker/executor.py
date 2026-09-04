@@ -8,12 +8,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
 from sqlalchemy import select
+
 from pkg.database import AsyncSessionLocal
-from pkg.models.task import Task, TaskStatus
-from pkg.models.attempt import TaskAttempt
-from pkg.redis_client import distributed_lock
-from pkg.messaging import get_rabbitmq_client
 from pkg.logger import get_logger, set_correlation_id
+from pkg.messaging import get_rabbitmq_client
+from pkg.models.attempt import TaskAttempt
+from pkg.models.task import Task, TaskStatus
+from pkg.redis_client import distributed_lock
 from services.worker.tasks.registry import get_handler
 
 logger = get_logger("worker-executor")
@@ -29,7 +30,7 @@ async def execute_task(task_payload: Dict[str, Any]) -> Tuple[bool, bool]:
     """
     Executes a task with distributed locking, idempotency check, timeout guard,
     attempt recording, and retry/DLQ state transitions.
-    
+   
     Returns: (is_success, should_requeue)
     """
     task_id = task_payload["id"]

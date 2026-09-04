@@ -1,7 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
+
 import redis.asyncio as aioredis
+
 from pkg.config import get_settings
 from pkg.logger import get_logger
 

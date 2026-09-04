@@ -1,15 +1,16 @@
+import os
 import time
 import uuid
-import httpx
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response, HTTPException, status
+
+import httpx
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from pkg.config import get_settings
 from pkg.logger import get_logger, set_correlation_id
 from pkg.redis_client import check_rate_limit, check_redis_health
-from pkg.security import decode_access_token
 
 settings = get_settings()
 logger = get_logger("api-gateway")
@@ -117,7 +118,7 @@ async def proxy_request(service_name: str, target_base_url: str, request: Reques
     except httpx.RequestError as exc:
         logger.error(f"Error communicating with {service_name}: {exc}")
         GATEWAY_REQUESTS.labels(method=request.method, service=service_name, status=503).inc()
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Service {service_name} unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Service {service_name} unavailable") from exc
 
     duration = time.time() - start_time
     GATEWAY_REQUESTS.labels(method=request.method, service=service_name, status=upstream_resp.status_code).inc()

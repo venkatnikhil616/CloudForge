@@ -1,14 +1,14 @@
 import asyncio
 import json
 import signal
-import sys
-from prometheus_client import Counter, Histogram, Gauge, start_http_server
+
 from aio_pika.abc import AbstractIncomingMessage
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 from pkg.config import get_settings
 from pkg.logger import get_logger
 from pkg.messaging import get_rabbitmq_client
-from services.worker.executor import execute_task, WORKER_ID
+from services.worker.executor import WORKER_ID, execute_task
 
 settings = get_settings()
 logger = get_logger("worker")

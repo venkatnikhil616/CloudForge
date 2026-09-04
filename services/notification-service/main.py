@@ -3,6 +3,7 @@ import json
 import signal
 import uuid
 from datetime import datetime, timezone
+
 from aio_pika.abc import AbstractIncomingMessage
 from prometheus_client import Counter, start_http_server
 

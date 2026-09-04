@@ -1,31 +1,32 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from pkg.database import get_db_session
-from pkg.models.user import User
-from pkg.security import hash_password, verify_password, create_access_token, decode_access_token
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from pkg.config import get_settings
+from pkg.database import get_db_session
 from pkg.logger import get_logger
+from pkg.models.user import User
+from pkg.security import create_access_token, decode_access_token, hash_password, verify_password
 
 try:
     from .schemas import (
-        UserRegisterRequest,
-        UserLoginRequest,
         TokenResponse,
-        UserResponse,
         TokenVerifyRequest,
         TokenVerifyResponse,
+        UserLoginRequest,
+        UserRegisterRequest,
+        UserResponse,
     )
 except ImportError:
     from schemas import (
-        UserRegisterRequest,
-        UserLoginRequest,
         TokenResponse,
-        UserResponse,
         TokenVerifyRequest,
         TokenVerifyResponse,
+        UserLoginRequest,
+        UserRegisterRequest,
+        UserResponse,
     )
 
 logger = get_logger("auth-service")
@@ -111,7 +112,7 @@ async def get_current_user(token: str, db: AsyncSession = Depends(get_db_session
         payload = decode_access_token(token)
         user_id = payload.get("sub")
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)) from e
 
     stmt = select(User).where(User.id == user_id)
     user = (await db.execute(stmt)).scalar_one_or_none()

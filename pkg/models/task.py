@@ -2,8 +2,10 @@ import enum
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from sqlalchemy import String, Integer, DateTime, Enum, JSON, ForeignKey, Index
+
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from pkg.database import Base
 
 

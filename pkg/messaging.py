@@ -1,7 +1,9 @@
 import json
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
+
 import aio_pika
-from aio_pika import ExchangeType, Message, DeliveryMode
+from aio_pika import DeliveryMode, ExchangeType, Message
+
 from pkg.config import get_settings
 from pkg.logger import get_logger
 

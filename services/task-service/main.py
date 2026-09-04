@@ -1,15 +1,16 @@
 import time
 import uuid
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from pkg.config import get_settings
-from pkg.logger import get_logger, set_correlation_id
 from pkg.database import check_database_health
+from pkg.logger import get_logger, set_correlation_id
+from pkg.messaging import check_rabbitmq_health, get_rabbitmq_client
 from pkg.redis_client import check_redis_health
-from pkg.messaging import get_rabbitmq_client, check_rabbitmq_health
 
 try:
     from .routes import router as task_router

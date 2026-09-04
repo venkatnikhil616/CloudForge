@@ -1,21 +1,22 @@
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Header
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from pkg.database import get_db_session
-from pkg.models.task import Task, TaskStatus
+from pkg.logger import get_logger
 from pkg.messaging import get_rabbitmq_client
+from pkg.models.task import Task, TaskStatus
 from pkg.redis_client import check_idempotency, store_idempotency
 from pkg.security import decode_access_token
-from pkg.logger import get_logger
 
 try:
-    from .schemas import CreateTaskRequest, TaskResponse, TaskListResponse
+    from .schemas import CreateTaskRequest, TaskListResponse, TaskResponse
 except ImportError:
-    from schemas import CreateTaskRequest, TaskResponse, TaskListResponse
+    from schemas import CreateTaskRequest, TaskListResponse, TaskResponse
 
 logger = get_logger("task-service")
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -33,7 +34,7 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
         payload = decode_access_token(token)
         return str(payload.get("sub"))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)) from e
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)

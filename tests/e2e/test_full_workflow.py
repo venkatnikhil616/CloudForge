@@ -1,7 +1,7 @@
+
 import pytest
-from unittest.mock import AsyncMock, patch
-from pkg.security import create_access_token
-from services.worker.tasks.registry import handle_report_generation, handle_data_processing
+
+from services.worker.tasks.registry import handle_data_processing, handle_report_generation
 
 
 @pytest.mark.asyncio

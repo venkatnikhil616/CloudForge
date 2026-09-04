@@ -1,11 +1,12 @@
 import asyncio
 import signal
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
 from croniter import croniter
-from sqlalchemy import select
 from prometheus_client import Counter, Gauge, start_http_server
+from sqlalchemy import select
 
 from pkg.config import get_settings
 from pkg.database import AsyncSessionLocal
@@ -51,7 +52,7 @@ async def process_due_schedules():
     now = datetime.now(timezone.utc)
     async with AsyncSessionLocal() as db:
         stmt = select(TaskSchedule).where(
-            TaskSchedule.is_enabled == True,
+            TaskSchedule.is_enabled.is_(True),
             TaskSchedule.next_run_at <= now,
         )
         due_schedules = (await db.execute(stmt)).scalars().all()
