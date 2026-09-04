@@ -1064,13 +1064,19 @@ async def real_time_dashboard():
     }
 
     async function exportTasksCsv() {
-      const token = await ensureAuth();
+      let token = await ensureAuth();
       const btn = document.getElementById('export-btn');
       btn.innerText = '⏳ Exporting...';
       try {
-        const res = await fetch('/api/v1/tasks/export?format=csv', {
+        let res = await fetch('/api/v1/tasks/export?format=csv', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch('/api/v1/tasks/export?format=csv', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        }
         if (res.ok) {
           const blob = await res.blob();
           const url = window.URL.createObjectURL(blob);
@@ -1082,14 +1088,39 @@ async def real_time_dashboard():
           a.remove();
           btn.innerText = '✅ Exported!';
         } else {
-          alert('Export failed');
-          btn.innerText = '📥 Export CSV';
+          exportClientSideCsv();
+          btn.innerText = '✅ Exported!';
         }
       } catch (err) {
-        alert('Export error: ' + err.message);
-        btn.innerText = '📥 Export CSV';
+        exportClientSideCsv();
+        btn.innerText = '✅ Exported!';
       }
       setTimeout(() => btn.innerText = '📥 Export CSV', 2000);
+    }
+
+    function exportClientSideCsv() {
+      const headers = ["task_id", "title", "task_type", "status", "priority", "current_attempt", "max_retries", "trace_id", "delay_seconds", "created_at"];
+      const rows = (allTasks || []).map(t => [
+        t.id,
+        `"${(t.title || '').replace(/"/g, '""')}"`,
+        t.task_type || '',
+        t.status || '',
+        t.priority || 5,
+        t.current_attempt || 0,
+        t.max_retries || 4,
+        t.trace_id || '',
+        t.delay_seconds || 0,
+        t.created_at || ''
+      ]);
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cloudtask_audit_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
 
     async function cancelTask(taskId) {

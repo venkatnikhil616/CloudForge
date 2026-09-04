@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def _resolve_database_url() -> str:
-    """Ensures PostgreSQL URL is formatted properly for asyncpg on Render / Cloud platforms."""
+    """Ensures PostgreSQL URL is formatted properly for asyncpg, or falls back to local SQLite."""
     raw_url = os.getenv("DATABASE_URL")
     if raw_url:
         if raw_url.startswith("postgres://"):
@@ -13,12 +13,17 @@ def _resolve_database_url() -> str:
         elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+asyncpg://"):
             return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return raw_url
-    user = os.getenv("POSTGRES_USER", "cloudtask")
-    password = os.getenv("POSTGRES_PASSWORD", "cloudtask_secret")
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "cloudtask_db")
-    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+
+    postgres_host = os.getenv("POSTGRES_HOST")
+    if postgres_host and postgres_host != "localhost":
+        user = os.getenv("POSTGRES_USER", "cloudtask")
+        password = os.getenv("POSTGRES_PASSWORD", "cloudtask_secret")
+        port = os.getenv("POSTGRES_PORT", "5432")
+        db = os.getenv("POSTGRES_DB", "cloudtask_db")
+        return f"postgresql+asyncpg://{user}:{password}@{postgres_host}:{port}/{db}"
+
+    # Default fallback when standalone / local without running Postgres
+    return os.getenv("FALLBACK_DATABASE_URL", "sqlite+aiosqlite:///cloudtask.db")
 
 
 class Settings(BaseSettings):
