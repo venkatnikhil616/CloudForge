@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     max_retries INTEGER DEFAULT 4 NOT NULL,
     current_attempt INTEGER DEFAULT 0 NOT NULL,
     timeout_seconds INTEGER DEFAULT 300 NOT NULL,
+    progress INTEGER DEFAULT 0 NOT NULL,
+    depends_on JSONB DEFAULT '[]'::jsonb NOT NULL,
+    trace_id VARCHAR(64),
     idempotency_key VARCHAR(255) UNIQUE,
     result JSONB,
     error_message VARCHAR(2000),
@@ -42,6 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type);
 CREATE INDEX IF NOT EXISTS idx_tasks_status_priority ON tasks(status, priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_trace_id ON tasks(trace_id);
 
 -- 3. Task Attempts Table
 CREATE TABLE IF NOT EXISTS task_attempts (
@@ -53,6 +57,7 @@ CREATE TABLE IF NOT EXISTS task_attempts (
     started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     finished_at TIMESTAMP WITH TIME ZONE,
     duration_ms INTEGER,
+    trace_id VARCHAR(64),
     error_message VARCHAR(2000),
     stack_trace VARCHAR(4000)
 );

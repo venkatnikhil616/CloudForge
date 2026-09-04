@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pkg.models.task import TaskStatus
 
@@ -13,10 +13,13 @@ class CreateTaskRequest(BaseModel):
     priority: int = Field(default=5, ge=1, le=10, description="1 (Low) to 10 (Critical)")
     max_retries: int = Field(default=4, ge=0, le=10)
     timeout_seconds: int = Field(default=300, ge=1, le=3600)
+    depends_on: List[str] = Field(default_factory=list, description="List of prerequisite task IDs (DAG execution)")
     idempotency_key: Optional[str] = Field(default=None, max_length=255)
 
 
 class TaskAttemptResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     attempt_number: int
     status: str
@@ -24,13 +27,13 @@ class TaskAttemptResponse(BaseModel):
     started_at: datetime
     finished_at: Optional[datetime] = None
     duration_ms: Optional[int] = None
+    trace_id: Optional[str] = None
     error_message: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class TaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     title: str
@@ -41,6 +44,9 @@ class TaskResponse(BaseModel):
     max_retries: int
     current_attempt: int
     timeout_seconds: int
+    progress: int = 0
+    depends_on: List[str] = []
+    trace_id: Optional[str] = None
     idempotency_key: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
@@ -48,9 +54,6 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     attempts: List[TaskAttemptResponse] = []
-
-    class Config:
-        from_attributes = True
 
 
 class TaskListResponse(BaseModel):

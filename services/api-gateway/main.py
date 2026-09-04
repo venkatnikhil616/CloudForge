@@ -135,8 +135,8 @@ async def root():
     </div>
 
     <div class="actions">
-      <a href="/docs" class="btn btn-primary">📖 Interactive Swagger UI (/docs)</a>
-      <a href="/redoc" class="btn btn-secondary">📑 API ReDoc</a>
+      <a href="/dashboard" class="btn btn-primary" style="background:#10B981;box-shadow:0 4px 14px rgba(16,185,129,0.35);">📊 Real-Time Task Dashboard</a>
+      <a href="/docs" class="btn btn-primary">📖 Swagger UI (/docs)</a>
       <button onclick="runLiveHealthCheck()" class="btn btn-secondary" id="health-btn">💚 Live Health Check</button>
     </div>
 
@@ -243,6 +243,348 @@ async def custom_swagger_ui_html():
     """
     html = html.replace("<body>", f"<body>{top_bar}", 1)
     return HTMLResponse(content=html)
+
+
+@app.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
+async def real_time_dashboard():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudTask - Real-Time Task Dashboard</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <style>
+    :root {
+      --bg: #0B0F19;
+      --card-bg: #111827;
+      --card-border: #1F2937;
+      --primary: #2563EB;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --text: #F3F4F6;
+      --text-muted: #9CA3AF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px 16px; min-height: 100vh; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 16px; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.25rem; color: #FFFFFF; }
+    .nav-links { display: flex; align-items: center; gap: 12px; }
+    .btn { padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--card-border); }
+    .metrics-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .metric-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 18px; }
+    .metric-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    .metric-val { font-size: 1.8rem; font-weight: 800; margin-top: 6px; }
+    .dispatch-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+    .dispatch-box h3 { font-size: 1.1rem; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+    .form-control { background: #070B14; border: 1px solid var(--card-border); border-radius: 6px; padding: 9px 12px; color: #fff; font-size: 0.9rem; }
+    .kanban-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    .kanban-col { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; min-height: 420px; }
+    .col-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--card-border); margin-bottom: 14px; font-weight: 700; font-size: 0.95rem; }
+    .task-card { background: #0D1527; border: 1px solid #1E293B; border-radius: 8px; padding: 14px; margin-bottom: 12px; transition: transform 0.2s; }
+    .task-card:hover { transform: translateY(-2px); border-color: #3B82F6; }
+    .task-title { font-weight: 600; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 6px; }
+    .task-meta { font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .tag { background: #1E293B; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .tag-prio { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+    .progress-bar { width: 100%; height: 6px; background: #1F2937; border-radius: 9999px; overflow: hidden; margin: 8px 0; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #3B82F6, #10B981); transition: width 0.4s; }
+    .card-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .btn-sm { padding: 4px 10px; font-size: 0.75rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="nav-brand">
+        <span>⚡ CloudTask Live Engine</span>
+        <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 3px 8px; border-radius: 9999px;">Cluster Active</span>
+      </div>
+      <div class="nav-links">
+        <a href="/" class="btn btn-secondary">← Home Portal</a>
+        <a href="/docs" class="btn btn-secondary">📖 Swagger API</a>
+        <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Metrics Bar -->
+    <div class="metrics-bar">
+      <div class="metric-card">
+        <div class="metric-label">Total Tasks</div>
+        <div class="metric-val" id="total-count" style="color: #60A5FA;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Queued / Ready</div>
+        <div class="metric-val" id="queued-count" style="color: #FBBF24;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Running in Cluster</div>
+        <div class="metric-val" id="running-count" style="color: #38BDF8;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Successfully Completed</div>
+        <div class="metric-val" id="success-count" style="color: #34D399;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Dead Letter Queue</div>
+        <div class="metric-val" id="dlq-count" style="color: #F87171;">0</div>
+      </div>
+    </div>
+
+    <!-- Quick Dispatcher -->
+    <div class="dispatch-box">
+      <h3>🚀 Dispatch Asynchronous Task to Cluster</h3>
+      <form id="task-form" onsubmit="handleDispatch(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Task Title</label>
+            <input type="text" id="task-title" class="form-control" placeholder="e.g. Generate Annual Ledger PDF" required />
+          </div>
+          <div class="form-group">
+            <label>Task Type (Handler)</label>
+            <select id="task-type" class="form-control">
+              <option value="report_generation">report_generation (PDF Export)</option>
+              <option value="data_processing">data_processing (ETL Batch)</option>
+              <option value="email_dispatch">email_dispatch (Transactional Email)</option>
+              <option value="system_cleanup">system_cleanup (Purge Temp Records)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Priority (1 = Low, 10 = Critical)</label>
+            <select id="task-priority" class="form-control">
+              <option value="10">10 - Critical Priority 🔥</option>
+              <option value="8" selected>8 - High Priority ⚡</option>
+              <option value="5">5 - Normal Priority</option>
+              <option value="1">1 - Low Priority</option>
+            </select>
+          </div>
+          <div class="form-group" style="align-self: flex-end;">
+            <button type="submit" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
+              ⚡ Enqueue Task to RabbitMQ
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Kanban Grid -->
+    <div class="kanban-grid">
+      <div class="kanban-col">
+        <div class="col-header">
+          <span>🟡 QUEUED</span>
+          <span id="badge-queued" class="tag">0</span>
+        </div>
+        <div id="col-queued"></div>
+      </div>
+      <div class="kanban-col">
+        <div class="col-header">
+          <span>🔵 RUNNING (Worker)</span>
+          <span id="badge-running" class="tag">0</span>
+        </div>
+        <div id="col-running"></div>
+      </div>
+      <div class="kanban-col">
+        <div class="col-header">
+          <span>🟢 COMPLETED</span>
+          <span id="badge-success" class="tag">0</span>
+        </div>
+        <div id="col-success"></div>
+      </div>
+      <div class="kanban-col">
+        <div class="col-header">
+          <span>🔴 DEAD_LETTERED / FAILED</span>
+          <span id="badge-dlq" class="tag">0</span>
+        </div>
+        <div id="col-dlq"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let authToken = localStorage.getItem('cloudtask_token') || '';
+
+    // Auto authenticate using demo seed user if no token exists
+    async function ensureAuth() {
+      if (authToken) return authToken;
+      try {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@cloudtask.dev', password: 'AdminSecurePass123!' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          authToken = data.access_token;
+          localStorage.setItem('cloudtask_token', authToken);
+        }
+      } catch (err) {
+        console.warn('Auto-login error:', err);
+      }
+      return authToken;
+    }
+
+    async function fetchTasks() {
+      const token = await ensureAuth();
+      if (!token) return;
+
+      try {
+        const res = await fetch('/api/v1/tasks?limit=50', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        renderTasks(data.tasks || []);
+      } catch (err) {
+        console.error('Fetch error:', err);
+      }
+    }
+
+    function renderTasks(tasks) {
+      const cols = {
+        QUEUED: document.getElementById('col-queued'),
+        RUNNING: document.getElementById('col-running'),
+        SUCCESS: document.getElementById('col-success'),
+        DEAD_LETTERED: document.getElementById('col-dlq'),
+      };
+
+      Object.values(cols).forEach(col => col.innerHTML = '');
+
+      let counts = { total: tasks.length, queued: 0, running: 0, success: 0, dlq: 0 };
+
+      tasks.forEach(task => {
+        const status = task.status;
+        if (status === 'QUEUED' || status === 'PENDING') counts.queued++;
+        else if (status === 'RUNNING') counts.running++;
+        else if (status === 'SUCCESS') counts.success++;
+        else counts.dlq++;
+
+        const card = document.createElement('div');
+        card.className = 'task-card';
+
+        let progressHtml = '';
+        if (status === 'RUNNING') {
+          progressHtml = `
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${Math.max(task.progress || 25, 20)}%;"></div>
+            </div>
+            <div style="font-size:0.75rem; color:#38BDF8;">Progress: ${task.progress || 25}%</div>
+          `;
+        }
+
+        let actionHtml = '';
+        if (status === 'QUEUED' || status === 'RUNNING') {
+          actionHtml = `<div class="card-actions"><button onclick="cancelTask('${task.id}')" class="btn btn-danger btn-sm">Cancel Task</button></div>`;
+        } else if (status === 'FAILED' || status === 'DEAD_LETTERED') {
+          actionHtml = `<div class="card-actions"><button onclick="retryTask('${task.id}')" class="btn btn-success btn-sm">Retry Task</button></div>`;
+        }
+
+        let resultPreview = '';
+        if (task.result) {
+          resultPreview = `<pre style="font-size:0.7rem; color:#34D399; margin-top:6px; overflow:hidden; text-overflow:ellipsis;">${JSON.stringify(task.result)}</pre>`;
+        }
+        if (task.error_message) {
+          resultPreview = `<div style="font-size:0.7rem; color:#F87171; margin-top:6px;">${task.error_message}</div>`;
+        }
+
+        card.innerHTML = `
+          <div class="task-title">${task.title}</div>
+          <div class="task-meta">
+            <span class="tag tag-prio">Prio ${task.priority}</span>
+            <span class="tag">${task.task_type}</span>
+            <span class="tag">Att: ${task.current_attempt}/${task.max_retries}</span>
+          </div>
+          ${progressHtml}
+          ${resultPreview}
+          ${actionHtml}
+        `;
+
+        if (status === 'QUEUED' || status === 'PENDING') cols.QUEUED.appendChild(card);
+        else if (status === 'RUNNING') cols.RUNNING.appendChild(card);
+        else if (status === 'SUCCESS') cols.SUCCESS.appendChild(card);
+        else cols.DEAD_LETTERED.appendChild(card);
+      });
+
+      document.getElementById('total-count').innerText = counts.total;
+      document.getElementById('queued-count').innerText = counts.queued;
+      document.getElementById('running-count').innerText = counts.running;
+      document.getElementById('success-count').innerText = counts.success;
+      document.getElementById('dlq-count').innerText = counts.dlq;
+
+      document.getElementById('badge-queued').innerText = counts.queued;
+      document.getElementById('badge-running').innerText = counts.running;
+      document.getElementById('badge-success').innerText = counts.success;
+      document.getElementById('badge-dlq').innerText = counts.dlq;
+    }
+
+    async function handleDispatch(e) {
+      e.preventDefault();
+      const token = await ensureAuth();
+      const title = document.getElementById('task-title').value;
+      const task_type = document.getElementById('task-type').value;
+      const priority = parseInt(document.getElementById('task-priority').value, 10);
+      const btn = document.getElementById('submit-btn');
+
+      btn.innerText = '⏳ Dispatching...';
+      try {
+        const res = await fetch('/api/v1/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            title: title,
+            task_type: task_type,
+            priority: priority,
+            payload: { timestamp: Date.now() }
+          })
+        });
+        if (res.ok) {
+          document.getElementById('task-title').value = '';
+          btn.innerText = '✅ Dispatched!';
+          setTimeout(() => btn.innerText = '⚡ Enqueue Task to RabbitMQ', 1500);
+          fetchTasks();
+        }
+      } catch (err) {
+        alert('Dispatch error: ' + err.message);
+        btn.innerText = '⚡ Enqueue Task to RabbitMQ';
+      }
+    }
+
+    async function cancelTask(taskId) {
+      const token = await ensureAuth();
+      await fetch(`/api/v1/tasks/${taskId}/cancel`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchTasks();
+    }
+
+    async function retryTask(taskId) {
+      const token = await ensureAuth();
+      await fetch(`/api/v1/tasks/${taskId}/retry`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchTasks();
+    }
+
+    // Initial fetch and 2-second live polling loop
+    fetchTasks();
+    setInterval(fetchTasks, 2500);
+  </script>
+</body>
+</html>"""
 
 
 # Health and Metrics
