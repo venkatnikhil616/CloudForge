@@ -3,9 +3,11 @@ set -e
 
 echo "=== CloudTask Starting on Render ==="
 
-# 1. Automatic Database Seeding / Migration
-echo "Running database initialization..."
-python database/seeds/seed_data.py || echo "Database seed skipped or will initialize on demand."
+export PYTHONPATH=/app:.
+
+# 1. Automatic Database Seeding / Migration (runs concurrently)
+echo "Running database initialization in background..."
+python database/seeds/seed_data.py &
 
 # 2. Start internal backend microservices in background
 echo "Starting Auth Service on internal port 8001..."

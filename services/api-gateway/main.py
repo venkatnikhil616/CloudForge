@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 import uuid
@@ -17,8 +18,8 @@ settings = get_settings()
 logger = get_logger("api-gateway")
 
 # Upstream Service URLs (overridable for cloud platforms)
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", f"http://localhost:{settings.AUTH_SERVICE_PORT}")
-TASK_SERVICE_URL = os.getenv("TASK_SERVICE_URL", f"http://localhost:{settings.TASK_SERVICE_PORT}")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", f"http://127.0.0.1:{settings.AUTH_SERVICE_PORT}")
+TASK_SERVICE_URL = os.getenv("TASK_SERVICE_URL", f"http://127.0.0.1:{settings.TASK_SERVICE_PORT}")
 
 # Metrics
 GATEWAY_REQUESTS = Counter(
@@ -654,8 +655,8 @@ async def real_time_dashboard():
     let activeMobileTab = 'ALL';
     let currentModalTaskId = null;
 
-    async function ensureAuth() {
-      if (authToken) return authToken;
+    async function ensureAuth(forceRefresh = false) {
+      if (authToken && !forceRefresh) return authToken;
       try {
         const res = await fetch('/api/v1/auth/login', {
           method: 'POST',
@@ -666,6 +667,10 @@ async def real_time_dashboard():
           const data = await res.json();
           authToken = data.access_token;
           localStorage.setItem('cloudtask_token', authToken);
+          return authToken;
+        } else {
+          localStorage.removeItem('cloudtask_token');
+          authToken = '';
         }
       } catch (err) {
         console.warn('Auto-login error:', err);
@@ -674,13 +679,21 @@ async def real_time_dashboard():
     }
 
     async function fetchTasks() {
-      const token = await ensureAuth();
+      let token = await ensureAuth();
       if (!token) return;
 
       try {
-        const res = await fetch('/api/v1/tasks?limit=100', {
+        let res = await fetch('/api/v1/tasks?limit=100', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          if (token) {
+            res = await fetch('/api/v1/tasks?limit=100', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+          }
+        }
         if (!res.ok) return;
 
         const data = await res.json();
@@ -961,15 +974,24 @@ async def real_time_dashboard():
 
     async function handleDispatch(e) {
       e.preventDefault();
-      const token = await ensureAuth();
-      const title = document.getElementById('task-title').value;
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.innerText = '⏳ Dispatching...';
+
+      let token = await ensureAuth();
+      const title = document.getElementById('task-title').value.trim();
       const task_type = document.getElementById('task-type').value;
       const priority = parseInt(document.getElementById('task-priority').value, 10);
       const delay = parseInt(document.getElementById('task-delay').value, 10) || 0;
       const webhook = document.getElementById('task-webhook').value.trim() || null;
-      const btn = document.getElementById('submit-btn');
 
-      btn.innerText = '⏳ Dispatching...';
+      if (!title) {
+        alert('Please enter a task title.');
+        btn.disabled = false;
+        btn.innerText = '⚡ Enqueue Task';
+        return;
+      }
+
       try {
         const payloadBody = {
           title: title,
@@ -980,7 +1002,7 @@ async def real_time_dashboard():
         };
         if (webhook) payloadBody.webhook_url = webhook;
 
-        const res = await fetch('/api/v1/tasks', {
+        let res = await fetch('/api/v1/tasks', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -988,16 +1010,39 @@ async def real_time_dashboard():
           },
           body: JSON.stringify(payloadBody)
         });
+
+        // Token expired check
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch('/api/v1/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payloadBody)
+          });
+        }
+
         if (res.ok) {
           document.getElementById('task-title').value = '';
           document.getElementById('task-webhook').value = '';
           document.getElementById('task-delay').value = '0';
           btn.innerText = '✅ Enqueued!';
-          setTimeout(() => btn.innerText = '⚡ Enqueue Task', 1500);
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerText = '⚡ Enqueue Task';
+          }, 1500);
           fetchTasks();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          alert('Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.'));
+          btn.disabled = false;
+          btn.innerText = '⚡ Enqueue Task';
         }
       } catch (err) {
         alert('Dispatch error: ' + err.message);
+        btn.disabled = false;
         btn.innerText = '⚡ Enqueue Task';
       }
     }
@@ -1106,17 +1151,23 @@ async def proxy_request(service_name: str, target_base_url: str, request: Reques
 
     body = await request.body()
 
-    try:
-        upstream_resp = await http_client.request(
-            method=request.method,
-            url=url,
-            headers=headers,
-            content=body,
-        )
-    except httpx.RequestError as exc:
-        logger.error(f"Error communicating with {service_name}: {exc}")
-        GATEWAY_REQUESTS.labels(method=request.method, service=service_name, status=503).inc()
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Service {service_name} unavailable") from exc
+    upstream_resp = None
+    for attempt in range(3):
+        try:
+            upstream_resp = await http_client.request(
+                method=request.method,
+                url=url,
+                headers=headers,
+                content=body,
+            )
+            break
+        except httpx.RequestError as exc:
+            if attempt < 2:
+                await asyncio.sleep(0.3)
+                continue
+            logger.error(f"Error communicating with {service_name}: {exc}")
+            GATEWAY_REQUESTS.labels(method=request.method, service=service_name, status=503).inc()
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Service {service_name} unavailable") from exc
 
     duration = time.time() - start_time
     GATEWAY_REQUESTS.labels(method=request.method, service=service_name, status=upstream_resp.status_code).inc()
