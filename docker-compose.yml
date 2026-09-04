@@ -1,0 +1,243 @@
+version: '3.8'
+
+networks:
+  cloudtask-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  grafana_data:
+
+services:
+  # ==========================================
+  # 1. Stateful Infrastructure (Section 18)
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudtask-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: cloudtask
+      POSTGRES_PASSWORD: cloudtask_secret
+      POSTGRES_DB: cloudtask_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+    networks:
+      - cloudtask-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudtask -d cloudtask_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cloudtask-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cloudtask-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: cloudtask-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - cloudtask-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 2. Stateless Core Microservices (Section 18)
+  # ==========================================
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: cloudtask-auth-service
+    restart: on-failure
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=cloudtask
+      - POSTGRES_PASSWORD=cloudtask_secret
+      - POSTGRES_DB=cloudtask_db
+      - AUTH_SERVICE_PORT=8001
+      - JWT_SECRET_KEY=super-secret-production-grade-encryption-key-change-me-in-prod
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cloudtask-network
+
+  task-service:
+    build:
+      context: .
+      dockerfile: services/task-service/Dockerfile
+    container_name: cloudtask-task-service
+    restart: on-failure
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - TASK_SERVICE_PORT=8002
+      - JWT_SECRET_KEY=super-secret-production-grade-encryption-key-change-me-in-prod
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cloudtask-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    deploy:
+      replicas: 2
+    restart: on-failure
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - WORKER_CONCURRENCY=5
+      - WORKER_MAX_RETRIES=4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cloudtask-network
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: services/scheduler/Dockerfile
+    container_name: cloudtask-scheduler
+    restart: on-failure
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cloudtask-network
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: cloudtask-notification-service
+    restart: on-failure
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - cloudtask-network
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: cloudtask-api-gateway
+    restart: on-failure
+    environment:
+      - REDIS_HOST=redis
+      - API_GATEWAY_PORT=8000
+      - AUTH_SERVICE_PORT=8001
+      - TASK_SERVICE_PORT=8002
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+      - task-service
+      - redis
+    networks:
+      - cloudtask-network
+
+  # ==========================================
+  # 3. Observability Stack (Section 29, 30, 31)
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: cloudtask-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - cloudtask-network
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: cloudtask-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - cloudtask-network
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: cloudtask-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - cloudtask-network
