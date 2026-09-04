@@ -312,7 +312,12 @@ async def replay_all_dlq_tasks(
     if not tasks:
         return DLQReplayResponse(replayed_count=0, message="No dead-lettered or failed tasks found to replay", task_ids=[])
 
-    mq_client = await get_rabbitmq_client()
+    mq_client = None
+    try:
+        mq_client = await get_rabbitmq_client()
+    except Exception as e:
+        logger.warning(f"RabbitMQ unavailable for DLQ replay: {e}")
+
     task_ids = []
     for task in tasks:
         task.status = TaskStatus.QUEUED
@@ -334,11 +339,15 @@ async def replay_all_dlq_tasks(
             "webhook_url": task.webhook_url,
             "delay_seconds": task.delay_seconds,
         }
-        await mq_client.publish_task(
-            task_payload=task_message,
-            priority=task.priority,
-            routing_key="task.created",
-        )
+        if mq_client:
+            try:
+                await mq_client.publish_task(
+                    task_payload=task_message,
+                    priority=task.priority,
+                    routing_key="task.created",
+                )
+            except Exception as e:
+                logger.warning(f"RabbitMQ publish deferred in DLQ replay for task {task.id}: {e}")
 
     await db.commit()
     logger.info(f"Redrive: Replayed {len(tasks)} DLQ tasks for user {user_id}")
@@ -563,26 +572,29 @@ async def retry_task(
     task.progress = 0
     await db.commit()
 
-    mq_client = await get_rabbitmq_client()
-    task_message = {
-        "id": task.id,
-        "user_id": task.user_id,
-        "title": task.title,
-        "task_type": task.task_type,
-        "payload": task.payload,
-        "priority": task.priority,
-        "max_retries": task.max_retries,
-        "current_attempt": task.current_attempt,
-        "timeout_seconds": task.timeout_seconds,
-        "trace_id": task.trace_id,
-        "webhook_url": task.webhook_url,
-        "delay_seconds": task.delay_seconds,
-    }
-    await mq_client.publish_task(
-        task_payload=task_message,
-        priority=task.priority,
-        routing_key="task.created",
-    )
+    try:
+        mq_client = await get_rabbitmq_client()
+        task_message = {
+            "id": task.id,
+            "user_id": task.user_id,
+            "title": task.title,
+            "task_type": task.task_type,
+            "payload": task.payload,
+            "priority": task.priority,
+            "max_retries": task.max_retries,
+            "current_attempt": task.current_attempt,
+            "timeout_seconds": task.timeout_seconds,
+            "trace_id": task.trace_id,
+            "webhook_url": task.webhook_url,
+            "delay_seconds": task.delay_seconds,
+        }
+        await mq_client.publish_task(
+            task_payload=task_message,
+            priority=task.priority,
+            routing_key="task.created",
+        )
+    except Exception as e:
+        logger.warning(f"RabbitMQ publish deferred for retried task {task.id}: {e}")
 
     logger.info(f"Task {task_id} manually re-queued for execution")
     return task

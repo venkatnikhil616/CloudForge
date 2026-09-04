@@ -610,7 +610,7 @@ async def real_time_dashboard():
             <span>🔴 DEAD_LETTERED / FAILED</span>
             <span id="badge-dlq" class="tag">0</span>
           </div>
-          <button onclick="replayAllDLQ()" class="btn btn-danger btn-xs" title="Replay all DLQ tasks" style="padding: 2px 7px;">🔥 Replay All</button>
+          <button id="replay-all-btn" onclick="replayAllDLQ()" class="btn btn-danger btn-xs" title="Replay all DLQ tasks" style="padding: 2px 7px;">Replay All</button>
         </div>
         <div id="col-dlq"></div>
       </div>
@@ -1034,18 +1034,14 @@ async def real_time_dashboard():
       btn.innerText = '⏳ Dispatching...';
 
       let token = await ensureAuth();
-      const title = document.getElementById('task-title').value.trim();
+      let title = document.getElementById('task-title').value.trim();
+      if (!title) {
+        title = 'Quick Task #' + Date.now().toString().slice(-4);
+      }
       const task_type = document.getElementById('task-type').value;
       const priority = parseInt(document.getElementById('task-priority').value, 10);
       const delay = parseInt(document.getElementById('task-delay').value, 10) || 0;
       const webhook = document.getElementById('task-webhook').value.trim() || null;
-
-      if (!title) {
-        alert('Please enter a task title.');
-        btn.disabled = false;
-        btn.innerText = '⚡ Enqueue Task';
-        return;
-      }
 
       try {
         const payloadBody = {
@@ -1103,18 +1099,37 @@ async def real_time_dashboard():
     }
 
     async function replayAllDLQ() {
-      if (!confirm('Replay all dead-lettered tasks back into the active queue?')) return;
-      const token = await ensureAuth();
+      const btn = document.getElementById('replay-all-btn');
+      const originalText = btn ? btn.innerText : 'Replay All';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '⏳ Replaying...';
+      }
       try {
-        const res = await fetch('/api/v1/tasks/dlq/replay-all', {
+        let token = await ensureAuth();
+        let res = await fetch('/api/v1/tasks/dlq/replay-all', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const data = await res.json();
-        alert(data.message || 'DLQ tasks replayed');
-        fetchTasks();
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch('/api/v1/tasks/dlq/replay-all', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          if (btn) btn.innerText = '✅ Replayed!';
+          setTimeout(() => { if (btn) { btn.disabled = false; btn.innerText = originalText; } }, 1500);
+          fetchTasks();
+        } else {
+          alert(data.detail || data.message || 'DLQ Replay failed');
+          if (btn) { btn.disabled = false; btn.innerText = originalText; }
+        }
       } catch (err) {
         alert('DLQ Replay error: ' + err.message);
+        if (btn) { btn.disabled = false; btn.innerText = originalText; }
       }
     }
 
@@ -1179,20 +1194,34 @@ async def real_time_dashboard():
     }
 
     async function cancelTask(taskId) {
-      const token = await ensureAuth();
-      await fetch(`/api/v1/tasks/${taskId}/cancel`, {
+      let token = await ensureAuth();
+      let res = await fetch(`/api/v1/tasks/${taskId}/cancel`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        token = await ensureAuth(true);
+        await fetch(`/api/v1/tasks/${taskId}/cancel`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
       fetchTasks();
     }
 
     async function retryTask(taskId) {
-      const token = await ensureAuth();
-      await fetch(`/api/v1/tasks/${taskId}/retry`, {
+      let token = await ensureAuth();
+      let res = await fetch(`/api/v1/tasks/${taskId}/retry`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        token = await ensureAuth(true);
+        await fetch(`/api/v1/tasks/${taskId}/retry`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
       fetchTasks();
     }
 
@@ -1209,7 +1238,7 @@ async def liveness():
     return {
         "status": "UP",
         "service": "api-gateway",
-        "version": "1.2.1",
+        "version": "1.2.2",
         "auth_loaded": auth_loaded,
         "task_loaded": task_loaded,
         "load_errors": load_errors,
