@@ -143,10 +143,7 @@ async def root():
     <div id="health-panel">
       <h4>
         <span>🟢 Live Diagnostics Result</span>
-        <div style="display:flex;gap:10px;align-items:center;">
-          <button type="button" onclick="copyHealthJson()" id="copy-btn" style="background:#1E293B;color:#94A3B8;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:0.75rem;cursor:pointer;">📋 Copy JSON</button>
-          <a href="/health/live" style="color:#60A5FA;font-size:0.8rem;text-decoration:underline;font-weight:500;">View /health/live</a>
-        </div>
+        <button type="button" onclick="copyHealthJson()" id="copy-btn" style="background:#1E293B;color:#94A3B8;border:1px solid #334155;border-radius:4px;padding:4px 10px;font-size:0.75rem;cursor:pointer;font-weight:500;">📋 Copy JSON</button>
       </h4>
       <div id="health-content">Checking services...</div>
     </div>
