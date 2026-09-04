@@ -1,6 +1,11 @@
 import asyncio
 import json
 import signal
+import sys
+from pathlib import Path
+
+# Ensure monorepo root is on sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from aio_pika.abc import AbstractIncomingMessage
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
@@ -54,25 +59,67 @@ async def on_message(message: AbstractIncomingMessage) -> None:
             await message.nack(requeue=False)
 
 
+async def poll_and_execute_tasks():
+    from sqlalchemy import select
+
+    from pkg.database import AsyncSessionLocal
+    from pkg.models.task import Task, TaskStatus
+
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(Task)
+                .where(Task.status == TaskStatus.QUEUED)
+                .order_by(Task.priority.desc(), Task.created_at.asc())
+                .limit(settings.WORKER_CONCURRENCY)
+            )
+            tasks = (await session.execute(stmt)).scalars().all()
+            for t in tasks:
+                task_dict = {
+                    "id": t.id,
+                    "user_id": t.user_id,
+                    "title": t.title,
+                    "task_type": t.task_type,
+                    "payload": t.payload or {},
+                    "priority": t.priority,
+                    "max_retries": t.max_retries,
+                    "current_attempt": t.current_attempt,
+                    "timeout_seconds": t.timeout_seconds,
+                    "trace_id": t.trace_id,
+                    "webhook_url": t.webhook_url,
+                    "delay_seconds": t.delay_seconds,
+                }
+                asyncio.create_task(execute_task(task_dict))
+    except Exception as e:
+        logger.warning(f"Database polling check: {e}")
+
+
 async def run_worker():
     global running
     logger.info(f"Starting CloudTask Worker [{WORKER_ID}] with concurrency {settings.WORKER_CONCURRENCY}")
     ACTIVE_WORKERS.inc()
 
-    mq_client = await get_rabbitmq_client()
-    channel = mq_client.channel
-    queue = await channel.get_queue(settings.RABBITMQ_TASK_QUEUE)
-
-    # Start consuming with prefetch limit
-    await queue.consume(on_message)
-    logger.info(f"Worker [{WORKER_ID}] subscribed to queue {settings.RABBITMQ_TASK_QUEUE}. Waiting for tasks...")
+    mq_client = None
+    try:
+        mq_client = await get_rabbitmq_client()
+        channel = mq_client.channel
+        queue = await channel.get_queue(settings.RABBITMQ_TASK_QUEUE)
+        await queue.consume(on_message)
+        logger.info(f"Worker [{WORKER_ID}] subscribed to queue {settings.RABBITMQ_TASK_QUEUE}.")
+    except Exception as e:
+        logger.warning(f"RabbitMQ connection deferred ({e}). Operating in resilient database-backed polling mode.")
 
     while running:
-        await asyncio.sleep(1)
+        if mq_client is None:
+            await poll_and_execute_tasks()
+            await asyncio.sleep(2)
+        else:
+            await asyncio.sleep(1)
 
     logger.info(f"Worker [{WORKER_ID}] gracefully shutting down...")
     ACTIVE_WORKERS.dec()
-    await mq_client.close()
+    if mq_client:
+        await mq_client.close()
 
 
 if __name__ == "__main__":

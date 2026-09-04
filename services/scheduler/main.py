@@ -1,8 +1,13 @@
 import asyncio
 import signal
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
+
+# Ensure monorepo root is on sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from croniter import croniter
 from prometheus_client import Counter, Gauge, start_http_server

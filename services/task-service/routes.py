@@ -158,7 +158,6 @@ async def create_task(
 
     # 3. Publish to RabbitMQ only if not blocked by DAG or scheduled delay
     if initial_status == TaskStatus.QUEUED:
-        mq_client = await get_rabbitmq_client()
         task_message = {
             "id": task.id,
             "user_id": task.user_id,
@@ -173,11 +172,15 @@ async def create_task(
             "webhook_url": task.webhook_url,
             "delay_seconds": task.delay_seconds,
         }
-        await mq_client.publish_task(
-            task_payload=task_message,
-            priority=task.priority,
-            routing_key="task.created",
-        )
+        try:
+            mq_client = await get_rabbitmq_client()
+            await mq_client.publish_task(
+                task_payload=task_message,
+                priority=task.priority,
+                routing_key="task.created",
+            )
+        except Exception as e:
+            logger.warning(f"RabbitMQ publish deferred/unavailable: {e}. Task safely stored in database.")
 
     stmt = select(Task).options(selectinload(Task.attempts)).where(Task.id == task_id)
     created_task = (await db.execute(stmt)).scalar_one()
@@ -268,13 +271,16 @@ async def create_batch_tasks(
     await db.commit()
 
     if queued_messages:
-        mq_client = await get_rabbitmq_client()
-        for msg in queued_messages:
-            await mq_client.publish_task(
-                task_payload=msg["payload"],
-                priority=msg["priority"],
-                routing_key="task.created",
-            )
+        try:
+            mq_client = await get_rabbitmq_client()
+            for msg in queued_messages:
+                await mq_client.publish_task(
+                    task_payload=msg["payload"],
+                    priority=msg["priority"],
+                    routing_key="task.created",
+                )
+        except Exception as e:
+            logger.warning(f"Batch RabbitMQ publish deferred/unavailable: {e}")
 
     task_ids = [t.id for t in created_tasks]
     stmt = select(Task).options(selectinload(Task.attempts)).where(Task.id.in_(task_ids))

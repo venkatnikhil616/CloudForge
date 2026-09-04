@@ -1,6 +1,11 @@
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+# Ensure monorepo root is on sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
