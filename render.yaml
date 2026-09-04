@@ -1,0 +1,40 @@
+version: "1"
+
+databases:
+  - name: cloudtask-db
+    databaseName: cloudtask_db
+    user: cloudtask
+    plan: free
+    region: oregon
+
+services:
+  - type: redis
+    name: cloudtask-redis
+    plan: free
+    region: oregon
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  - type: web
+    name: cloudtask-platform
+    env: docker
+    dockerfilePath: ./Dockerfile.render
+    plan: free
+    region: oregon
+    healthCheckPath: /health/live
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cloudtask-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: cloudtask-redis
+          property: connectionString
+      - key: RABBITMQ_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true

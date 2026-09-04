@@ -14,9 +14,9 @@ from pkg.security import decode_access_token
 settings = get_settings()
 logger = get_logger("api-gateway")
 
-# Upstream Service URLs
-AUTH_SERVICE_URL = f"http://localhost:{settings.AUTH_SERVICE_PORT}"
-TASK_SERVICE_URL = f"http://localhost:{settings.TASK_SERVICE_PORT}"
+# Upstream Service URLs (overridable for cloud platforms)
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", f"http://localhost:{settings.AUTH_SERVICE_PORT}")
+TASK_SERVICE_URL = os.getenv("TASK_SERVICE_URL", f"http://localhost:{settings.TASK_SERVICE_PORT}")
 
 # Metrics
 GATEWAY_REQUESTS = Counter(

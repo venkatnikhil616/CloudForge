@@ -3,6 +3,23 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _resolve_database_url() -> str:
+    """Ensures PostgreSQL URL is formatted properly for asyncpg on Render / Cloud platforms."""
+    raw_url = os.getenv("DATABASE_URL")
+    if raw_url:
+        if raw_url.startswith("postgres://"):
+            return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+asyncpg://"):
+            return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return raw_url
+    user = os.getenv("POSTGRES_USER", "cloudtask")
+    password = os.getenv("POSTGRES_PASSWORD", "cloudtask_secret")
+    host = os.getenv("POSTGRES_HOST", "localhost")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    db = os.getenv("POSTGRES_DB", "cloudtask_db")
+    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -14,16 +31,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
-    # PostgreSQL
-    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "cloudtask")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "cloudtask_secret")
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "cloudtask_db")
-    POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "localhost")
-    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-    )
+    # PostgreSQL (Auto-formats postgres:// from Render / Cloud providers to postgresql+asyncpg://)
+    DATABASE_URL: str = _resolve_database_url()
 
     # Redis
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
@@ -50,8 +59,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-    # Ports
-    API_GATEWAY_PORT: int = int(os.getenv("API_GATEWAY_PORT", "8000"))
+    # Dynamic Port Handling (Render passes $PORT for web service)
+    API_GATEWAY_PORT: int = int(os.getenv("PORT", os.getenv("API_GATEWAY_PORT", "8000")))
     AUTH_SERVICE_PORT: int = int(os.getenv("AUTH_SERVICE_PORT", "8001"))
     TASK_SERVICE_PORT: int = int(os.getenv("TASK_SERVICE_PORT", "8002"))
     NOTIFICATION_SERVICE_PORT: int = int(os.getenv("NOTIFICATION_SERVICE_PORT", "8003"))
