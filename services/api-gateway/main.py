@@ -39,6 +39,9 @@ GATEWAY_LATENCY = Histogram(
 )
 
 http_client: httpx.AsyncClient = None
+load_errors: dict = {}
+auth_loaded: bool = False
+task_loaded: bool = False
 
 
 @asynccontextmanager
@@ -1203,7 +1206,14 @@ async def real_time_dashboard():
 # Health and Metrics
 @app.get("/health/live", tags=["Health"])
 async def liveness():
-    return {"status": "UP", "service": "api-gateway", "version": "1.1.0"}
+    return {
+        "status": "UP",
+        "service": "api-gateway",
+        "version": "1.2.0",
+        "auth_loaded": auth_loaded,
+        "task_loaded": task_loaded,
+        "load_errors": load_errors,
+    }
 
 
 @app.get("/health/ready", tags=["Health"])
@@ -1266,30 +1276,40 @@ async def proxy_request(service_name: str, target_base_url: str, request: Reques
 
 
 # In-process routers (with fallback to reverse proxy)
-auth_loaded = False
+def load_service_router(service_dir_name: str):
+    import importlib.util
+    root_dir = Path(__file__).resolve().parent.parent
+    file_path = root_dir / service_dir_name / "routes.py"
+    pkg_name = f"services.{service_dir_name}"
+    mod_name = f"services.{service_dir_name}.routes"
+    spec = importlib.util.spec_from_file_location(
+        mod_name,
+        file_path,
+        submodule_search_locations=[str(root_dir / service_dir_name)]
+    )
+    module = importlib.util.module_from_spec(spec)
+    module.__package__ = pkg_name
+    sys.modules[mod_name] = module
+    spec.loader.exec_module(module)
+    return module.router
+
+
 try:
-    import importlib
-    try:
-        auth_routes = importlib.import_module("services.auth-service.routes")
-    except Exception:
-        import services.auth_service.routes as auth_routes
-    app.include_router(auth_routes.router, prefix="/api/v1")
+    auth_router = load_service_router("auth-service")
+    app.include_router(auth_router, prefix="/api/v1")
     auth_loaded = True
     logger.info("Direct in-process Auth router registered successfully.")
 except Exception as e:
+    load_errors["auth"] = f"{type(e).__name__}: {str(e)}"
     logger.warning(f"Could not load in-process Auth router ({e}). Using reverse proxy routes.")
 
-task_loaded = False
 try:
-    import importlib
-    try:
-        task_routes = importlib.import_module("services.task-service.routes")
-    except Exception:
-        import services.task_service.routes as task_routes
-    app.include_router(task_routes.router, prefix="/api/v1")
+    task_router = load_service_router("task-service")
+    app.include_router(task_router, prefix="/api/v1")
     task_loaded = True
     logger.info("Direct in-process Task router registered successfully.")
 except Exception as e:
+    load_errors["task"] = f"{type(e).__name__}: {str(e)}"
     logger.warning(f"Could not load in-process Task router ({e}). Using reverse proxy routes.")
 
 if not auth_loaded:
