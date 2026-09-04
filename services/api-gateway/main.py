@@ -143,7 +143,10 @@ async def root():
     <div id="health-panel">
       <h4>
         <span>🟢 Live Diagnostics Result</span>
-        <a href="/health/live" target="_blank" style="color: #9CA3AF; font-size: 0.8rem; text-decoration: underline;">Open Raw JSON ↗</a>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button type="button" onclick="copyHealthJson()" id="copy-btn" style="background:#1E293B;color:#94A3B8;border:1px solid #334155;border-radius:4px;padding:3px 8px;font-size:0.75rem;cursor:pointer;">📋 Copy JSON</button>
+          <a href="/health/live" style="color:#60A5FA;font-size:0.8rem;text-decoration:underline;font-weight:500;">View /health/live</a>
+        </div>
       </h4>
       <div id="health-content">Checking services...</div>
     </div>
@@ -175,6 +178,17 @@ async def root():
   </div>
 
   <script>
+    let lastHealthJson = '';
+
+    function copyHealthJson() {
+      if (lastHealthJson && navigator.clipboard) {
+        navigator.clipboard.writeText(lastHealthJson);
+        const btn = document.getElementById('copy-btn');
+        btn.innerText = '✅ Copied!';
+        setTimeout(() => { btn.innerText = '📋 Copy JSON'; }, 2000);
+      }
+    }
+
     async function runLiveHealthCheck() {
       const panel = document.getElementById('health-panel');
       const content = document.getElementById('health-content');
@@ -193,12 +207,13 @@ async def root():
         const liveData = await liveRes.json();
         const readyData = await readyRes.json();
         
+        lastHealthJson = JSON.stringify({ liveness: liveData, readiness: readyData, latency_ms: latency }, null, 2);
         btn.innerText = '✅ Health Verified (' + latency + 'ms)';
         content.innerHTML = `
           <p style="margin-bottom: 6px;"><strong>Status:</strong> <span style="color: #34D399;">ONLINE</span> (Latency: ${latency}ms)</p>
           <p style="margin-bottom: 6px;"><strong>API Gateway:</strong> ${liveData.status === 'UP' ? '✅ UP' : '❌ DOWN'}</p>
           <p style="margin-bottom: 6px;"><strong>Redis Cache:</strong> ${readyData.redis === 'CONNECTED' ? '✅ CONNECTED' : '⚠️ ' + readyData.redis}</p>
-          <pre>${JSON.stringify({ liveness: liveData, readiness: readyData, latency_ms: latency }, null, 2)}</pre>
+          <pre>${lastHealthJson}</pre>
         `;
       } catch (err) {
         btn.innerText = '❌ Test Error';
