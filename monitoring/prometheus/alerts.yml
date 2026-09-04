@@ -1,0 +1,26 @@
+groups:
+  - name: cloudtask_alerts
+    rules:
+      - alert: HighTaskFailureRate
+        expr: rate(worker_tasks_failed_total[5m]) / rate(worker_tasks_processed_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Task failure rate detected in CloudTask worker pool (>10%)"
+
+      - alert: WorkerInstanceDown
+        expr: worker_active_count == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No active CloudTask workers detected"
+
+      - alert: HighSchedulerErrors
+        expr: rate(scheduler_errors_total[5m]) > 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scheduler encountering recurring errors during schedule processing"
