@@ -1209,7 +1209,7 @@ async def liveness():
     return {
         "status": "UP",
         "service": "api-gateway",
-        "version": "1.2.0",
+        "version": "1.2.1",
         "auth_loaded": auth_loaded,
         "task_loaded": task_loaded,
         "load_errors": load_errors,

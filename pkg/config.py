@@ -1,6 +1,7 @@
 import os
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +40,17 @@ class Settings(BaseSettings):
 
     # PostgreSQL (Auto-formats postgres:// from Render / Cloud providers to postgresql+asyncpg://)
     DATABASE_URL: str = _resolve_database_url()
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def format_database_url(cls, v: object) -> str:
+        if isinstance(v, str) and v:
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return v
+        return _resolve_database_url()
 
     # Redis
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
