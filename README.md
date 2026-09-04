@@ -2,6 +2,8 @@
 ### Production-Grade Distributed Task Processing Platform
 
 [![CI Pipeline](https://github.com/venkatnikhil616/CloudForge/actions/workflows/ci.yml/badge.svg)](https://github.com/venkatnikhil616/CloudForge/actions)
+[![Live Demo](https://img.shields.io/badge/Render-Live%20Platform-success?logo=render&logoColor=white)](https://cloudtask-platform.onrender.com/dashboard)
+[![Swagger Docs](https://img.shields.io/badge/OpenAPI-Swagger%20Docs-blue?logo=swagger)](https://cloudtask-platform.onrender.com/docs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com)
@@ -10,6 +12,48 @@
 [![ArgoCD](https://img.shields.io/badge/GitOps-Argo%20CD-EF7B42.svg)](https://argoproj.github.io/cd/)
 
 CloudTask is a high-throughput, distributed asynchronous task orchestration and execution platform designed for modern microservice architectures. Built with **Python (FastAPI)**, **PostgreSQL**, **Redis**, and **RabbitMQ**, CloudTask guarantees durable at-least-once message processing, distributed two-tier idempotency, priority scheduling, automated exponential backoff retries, Dead-Letter Queue (DLQ) redrive, and comprehensive observability.
+
+---
+
+## 🌐 Live Cloud Deployment
+
+CloudTask is deployed live on Render with automated database migrations and zero-downtime health probes:
+
+| Service / Interface | Public URL | Description |
+| :--- | :--- | :--- |
+| **🚀 Operations Dashboard** | [cloudtask-platform.onrender.com/dashboard](https://cloudtask-platform.onrender.com/dashboard) | Real-time monitoring, task dispatch, DLQ redrive & CSV export |
+| **📖 Interactive API Docs** | [cloudtask-platform.onrender.com/docs](https://cloudtask-platform.onrender.com/docs) | Interactive Swagger OpenAPI documentation & test console |
+| **❤️ Health Probe (Liveness)** | [cloudtask-platform.onrender.com/health/live](https://cloudtask-platform.onrender.com/health/live) | Gateway & downstream microservice health status |
+| **🔍 Health Probe (Readiness)** | [cloudtask-platform.onrender.com/health/ready](https://cloudtask-platform.onrender.com/health/ready) | Deep DB & Redis connectivity verification |
+
+### Default Admin Credentials
+For testing role-protected endpoints or dashboard administrative actions:
+* **Email:** `admin@cloudtask.dev`
+* **Password:** `AdminSecurePass123!`
+
+---
+
+## 🖥️ Web Operations Dashboard Walkthrough
+
+The built-in Web Operations Dashboard (`/dashboard`) provides end-to-end task lifecycle management and real-time operational oversight:
+
+1. **Live Metric Cards**:
+   - **Pending & Processing**: Instant visibility into queue depth and worker utilization.
+   - **Completed & DLQ**: Real-time counters of completed executions and failed tasks routed to the Dead Letter Queue.
+   - **Performance Stats**: Continuous calculation of average task execution latency and success rate percentages.
+
+2. **⚡ Quick Task Dispatcher**:
+   - Easily enqueue background jobs directly from the dashboard.
+   - Configurable **Task Title**, **Task Type** (`data_sync`, `report_generation`, `email_dispatch`, `heavy_compute`), **Priority (1-10)**, and JSON Payload.
+   - Auto-fills default task title if left blank.
+
+3. **📥 One-Click CSV Audit Export**:
+   - Click **Export CSV** to immediately stream full operational task history.
+   - Features dual fallback: streams via the authenticated backend API endpoint (`/api/v1/tasks/export?format=csv`) and seamlessly falls back to client-side data compilation if offline.
+
+4. **🔄 Dead-Letter Queue (DLQ) & 1-Click Replay**:
+   - Inspect failed tasks with full failure reasons and execution attempt counters.
+   - Click **Replay All** to redrive all failed tasks back into the primary worker priority queues with exponential backoff reset.
 
 ---
 
@@ -74,12 +118,65 @@ CloudTask is a high-throughput, distributed asynchronous task orchestration and 
 
 ---
 
+## 💻 Quick API Usage (cURL Examples)
+
+All endpoints can be exercised against the live platform or your local instance.
+
+### 1. Health & Liveness
+```bash
+curl -s https://cloudtask-platform.onrender.com/health/live | jq .
+```
+
+### 2. Authenticate & Obtain Access Token
+```bash
+TOKEN=$(curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@cloudtask.dev", "password": "AdminSecurePass123!"}' | jq -r .access_token)
+
+echo "JWT: $TOKEN"
+```
+
+### 3. Enqueue a Background Task
+```bash
+curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "title": "Batch Data Ingestion",
+    "task_type": "data_sync",
+    "priority": 8,
+    "payload": {"records": 5000, "source": "s3://datasets/daily.parquet"}
+  }' | jq .
+```
+
+### 4. Query Task Status
+```bash
+curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/<TASK_ID>" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### 5. Export Task Audit History to CSV
+```bash
+curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/export?format=csv" \
+  -H "Authorization: Bearer $TOKEN" -o tasks_audit_log.csv
+
+head -n 5 tasks_audit_log.csv
+```
+
+### 6. Replay Dead Letter Queue (DLQ)
+```bash
+curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/dlq/replay \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
 ## 📂 Monorepo Repository Layout
 
 ```
 .
 ├── services/
-│   ├── api-gateway/            # Unified API gateway, reverse proxy & rate limiting
+│   ├── api-gateway/            # Unified API gateway, dashboard UI & rate limiting
 │   ├── auth-service/           # User authentication, registration & JWT issuance
 │   ├── task-service/           # Task CRUD, state tracker & RabbitMQ publisher
 │   ├── worker/                 # Distributed async task consumer & executor
@@ -135,10 +232,10 @@ cd CloudForge
 make docker-up
 ```
 
-### 2. Available Service Endpoints
+### 2. Available Local Service Endpoints
 | Component | URL | Credentials / Notes |
 | :--- | :--- | :--- |
-| **API Gateway** | `http://localhost:8000` | Unified Entry Point |
+| **API Gateway & Dashboard** | `http://localhost:8000` / `/dashboard` | Unified Entry Point |
 | **Auth Service** | `http://localhost:8001` | Direct Service Port |
 | **Task Service** | `http://localhost:8002` | Direct Service Port |
 | **RabbitMQ UI** | `http://localhost:15672` | `guest` / `guest` |
