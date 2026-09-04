@@ -525,17 +525,16 @@ async def real_time_dashboard():
       </div>
     </div>
 
-    <!-- Quick Dispatcher Form (Collapsible) -->
-    <div class="dispatch-box" id="dispatch-panel" style="display: none;">
+    <!-- Quick Dispatcher Form -->
+    <div class="dispatch-box" id="dispatch-panel" style="display: block;">
       <h3>
         <span>🚀 Dispatch Asynchronous Task to Cluster</span>
-        <button type="button" onclick="toggleDispatcher()" style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:0.9rem;">✕ Close</button>
       </h3>
       <form id="task-form" onsubmit="handleDispatch(event)">
         <div class="form-grid">
           <div class="form-group">
             <label>Task Title</label>
-            <input type="text" id="task-title" class="form-control" placeholder="e.g. Ingest Customer Ledger" required />
+            <input type="text" id="task-title" class="form-control" placeholder="e.g. Ingest Customer Ledger" />
           </div>
           <div class="form-group">
             <label>Handler Type</label>
@@ -761,14 +760,12 @@ async def real_time_dashboard():
 
     function toggleDispatcher() {
       const panel = document.getElementById('dispatch-panel');
-      const btn = document.getElementById('toggle-dispatch-btn');
       if (panel.style.display === 'none') {
         panel.style.display = 'block';
-        btn.innerText = '➖ Close Form';
-      } else {
-        panel.style.display = 'none';
-        btn.innerText = '➕ New Task';
       }
+      panel.scrollIntoView({ behavior: 'smooth' });
+      const input = document.getElementById('task-title');
+      if (input) input.focus();
     }
 
     function handleSearch(val) {
@@ -1182,7 +1179,7 @@ async def real_time_dashboard():
         t.delay_seconds || 0,
         t.created_at || ''
       ]);
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join(String.fromCharCode(10));
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1238,7 +1235,7 @@ async def liveness():
     return {
         "status": "UP",
         "service": "api-gateway",
-        "version": "1.2.2",
+        "version": "1.2.3",
         "auth_loaded": auth_loaded,
         "task_loaded": task_loaded,
         "load_errors": load_errors,
