@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
@@ -50,6 +51,7 @@ app = FastAPI(
     version="1.0.0",
     description="Unified API Gateway with rate limiting, correlation tracking, and security enforcement",
     lifespan=lifespan,
+    docs_url=None,
 )
 
 
@@ -133,8 +135,8 @@ async def root():
     </div>
 
     <div class="actions">
-      <a href="/docs" class="btn btn-primary" target="_blank">📖 Interactive Swagger UI (/docs)</a>
-      <a href="/redoc" class="btn btn-secondary" target="_blank">📑 API ReDoc</a>
+      <a href="/docs" class="btn btn-primary">📖 Interactive Swagger UI (/docs)</a>
+      <a href="/redoc" class="btn btn-secondary">📑 API ReDoc</a>
       <button onclick="runLiveHealthCheck()" class="btn btn-secondary" id="health-btn">💚 Live Health Check</button>
     </div>
 
@@ -206,6 +208,29 @@ async def root():
   </script>
 </body>
 </html>"""
+
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    response = get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=app.title + " - Swagger UI",
+        swagger_favicon_url="https://fastapi.tiangolo.com/img/favicon.png",
+    )
+    html = response.body.decode("utf-8")
+    top_bar = """
+    <div style="background:#0B0F19;border-bottom:1px solid #1F2937;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:99999;font-family:system-ui, -apple-system, sans-serif;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-weight:700;color:#FFFFFF;font-size:1.1rem;letter-spacing:-0.02em;">⚡ CloudTask API Explorer</span>
+        <span style="background:rgba(59,130,246,0.15);color:#60A5FA;padding:3px 10px;border-radius:9999px;font-size:0.75rem;font-weight:600;border:1px solid rgba(59,130,246,0.3);">Swagger UI</span>
+      </div>
+      <a href="/" style="background:#2563EB;color:#FFFFFF;text-decoration:none;padding:8px 18px;border-radius:6px;font-weight:600;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(37,99,235,0.4);transition:background 0.2s;">
+        ← Back to Portal
+      </a>
+    </div>
+    """
+    html = html.replace("<body>", f"<body>{top_bar}", 1)
+    return HTMLResponse(content=html)
 
 
 # Health and Metrics
