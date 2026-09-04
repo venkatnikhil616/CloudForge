@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloudtask-service-account
+  namespace: cloudtask
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cloudtask-pod-reader
+  namespace: cloudtask
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cloudtask-rolebinding
+  namespace: cloudtask
+subjects:
+  - kind: ServiceAccount
+    name: cloudtask-service-account
+    namespace: cloudtask
+roleRef:
+  kind: Role
+  name: cloudtask-pod-reader
+  apiGroup: rbac.authorization.k8s.io

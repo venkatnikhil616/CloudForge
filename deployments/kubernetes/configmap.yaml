@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudtask-config
+  namespace: cloudtask
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  POSTGRES_HOST: "postgres.cloudtask.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "cloudtask_db"
+  POSTGRES_USER: "cloudtask"
+  REDIS_HOST: "redis.cloudtask.svc.cluster.local"
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: "rabbitmq.cloudtask.svc.cluster.local"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_EXCHANGE: "cloudtask.events"
+  RABBITMQ_TASK_QUEUE: "cloudtask.tasks"
+  RABBITMQ_DLQ_QUEUE: "cloudtask.tasks.dlq"
+  RABBITMQ_NOTIFICATION_QUEUE: "cloudtask.notifications"
+  API_GATEWAY_PORT: "8000"
+  AUTH_SERVICE_PORT: "8001"
+  TASK_SERVICE_PORT: "8002"
+  NOTIFICATION_SERVICE_PORT: "8003"
+  WORKER_CONCURRENCY: "10"
+  WORKER_MAX_RETRIES: "4"

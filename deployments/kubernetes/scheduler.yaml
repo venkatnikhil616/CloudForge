@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  namespace: cloudtask
+  labels:
+    app: scheduler
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scheduler
+  template:
+    metadata:
+      labels:
+        app: scheduler
+    spec:
+      serviceAccountName: cloudtask-service-account
+      containers:
+        - name: scheduler
+          image: cloudtask/scheduler:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9092
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: cloudtask-config
+            - secretRef:
+                name: cloudtask-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi

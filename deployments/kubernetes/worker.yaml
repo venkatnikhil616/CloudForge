@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: cloudtask
+  labels:
+    app: worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      serviceAccountName: cloudtask-service-account
+      containers:
+        - name: worker
+          image: cloudtask/worker:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9091
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: cloudtask-config
+            - secretRef:
+                name: cloudtask-secrets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
