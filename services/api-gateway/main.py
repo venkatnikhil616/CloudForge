@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from pkg.config import get_settings
@@ -73,6 +73,95 @@ async def gateway_middleware(request: Request, call_next):
     response.headers["X-Correlation-ID"] = correlation_id
     response.headers["X-Response-Time-Ms"] = str(int((time.time() - start_time) * 1000))
     return response
+
+
+@app.get("/", response_class=HTMLResponse, tags=["General"])
+async def root():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudTask Platform - Distributed Task Engine</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <style>
+    :root {
+      --bg: #0B0F19;
+      --card-bg: #111827;
+      --card-border: #1F2937;
+      --primary: #3B82F6;
+      --accent: #10B981;
+      --text: #F3F4F6;
+      --text-muted: #9CA3AF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 40px 20px; line-height: 1.6; }
+    .container { max-width: 960px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .badge { display: inline-block; background: rgba(59, 130, 246, 0.15); color: #60A5FA; padding: 6px 14px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; margin-bottom: 12px; border: 1px solid rgba(59, 130, 246, 0.3); }
+    h1 { font-size: 2.5rem; font-weight: 800; color: #FFFFFF; margin-bottom: 10px; }
+    .subtitle { color: var(--text-muted); font-size: 1.15rem; max-width: 650px; margin: 0 auto; }
+    .status-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); color: #34D399; padding: 6px 16px; border-radius: 9999px; font-size: 0.9rem; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3); margin-top: 20px; }
+    .pulse { width: 10px; height: 10px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 10px #10B981; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } 100% { opacity: 1; transform: scale(1); } }
+    .actions { display: flex; justify-content: center; gap: 16px; margin: 35px 0; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; transition: all 0.2s ease; font-size: 1rem; }
+    .btn-primary { background: #2563EB; color: #FFFFFF; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); }
+    .btn-primary:hover { background: #1D4ED8; transform: translateY(-1px); }
+    .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--card-border); }
+    .btn-secondary:hover { background: #1F2937; transform: translateY(-1px); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 40px; }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 24px; }
+    .card h3 { color: #FFFFFF; font-size: 1.15rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .card p { color: var(--text-muted); font-size: 0.95rem; }
+    .code-box { background: #000000; border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; margin-top: 30px; font-family: monospace; font-size: 0.9rem; color: #A7F3D0; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="badge">⚡ B.Tech Capstone Project</span>
+      <h1>CloudTask Distributed Engine</h1>
+      <p class="subtitle">A production-grade, cloud-native asynchronous distributed task processing platform inspired by Celery, Sidekiq & AWS SQS.</p>
+      <div class="status-badge">
+        <div class="pulse"></div>
+        <span>All Services Operational (Live on Render)</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/docs" class="btn btn-primary">📖 Explore Interactive Swagger UI (/docs)</a>
+      <a href="/redoc" class="btn btn-secondary">📑 API ReDoc</a>
+      <a href="/health/live" class="btn btn-secondary">💚 Health Check</a>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>🛡️ At-Least-Once Delivery</h3>
+        <p>Reliable message execution with Redis distributed mutex locking & PostgreSQL idempotency keys.</p>
+      </div>
+      <div class="card">
+        <h3>🔁 Exponential Retries & DLQ</h3>
+        <p>Automated exponential backoff retries with dead-letter queueing for poisoned messages.</p>
+      </div>
+      <div class="card">
+        <h3>⚡ Priority Task Queuing</h3>
+        <p>RabbitMQ priority queues (1-10) with multi-worker concurrent dispatching.</p>
+      </div>
+      <div class="card">
+        <h3>🔒 Stateless JWT Security</h3>
+        <p>Bcrypt password hashing, token validation, rate limiting & correlation ID tracking.</p>
+      </div>
+    </div>
+
+    <div class="code-box">
+      # Quick Test via cURL:<br>
+      curl https://cloudtask-platform.onrender.com/health/live<br>
+      # Response: {"status": "UP", "service": "api-gateway"}
+    </div>
+  </div>
+</body>
+</html>"""
 
 
 # Health and Metrics
