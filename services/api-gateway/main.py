@@ -105,7 +105,7 @@ async def root():
     .pulse { width: 10px; height: 10px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 10px #10B981; animation: pulse 2s infinite; }
     @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } 100% { opacity: 1; transform: scale(1); } }
     .actions { display: flex; justify-content: center; gap: 16px; margin: 35px 0; flex-wrap: wrap; }
-    .btn { display: inline-flex; align-items: center; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; transition: all 0.2s ease; font-size: 1rem; }
+    .btn { display: inline-flex; align-items: center; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; transition: all 0.2s ease; font-size: 1rem; cursor: pointer; border: none; }
     .btn-primary { background: #2563EB; color: #FFFFFF; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); }
     .btn-primary:hover { background: #1D4ED8; transform: translateY(-1px); }
     .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--card-border); }
@@ -115,24 +115,35 @@ async def root():
     .card h3 { color: #FFFFFF; font-size: 1.15rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
     .card p { color: var(--text-muted); font-size: 0.95rem; }
     .code-box { background: #000000; border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; margin-top: 30px; font-family: monospace; font-size: 0.9rem; color: #A7F3D0; overflow-x: auto; }
+    #health-panel { display: none; background: #0D1527; border: 1px solid #1D4ED8; border-radius: 10px; padding: 20px; margin: 25px auto 0; text-align: left; max-width: 600px; }
+    #health-panel h4 { color: #60A5FA; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+    #health-panel pre { background: #070B14; padding: 12px; border-radius: 6px; color: #34D399; font-size: 0.85rem; overflow-x: auto; margin-top: 10px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <span class="badge">⚡ B.Tech Capstone Project</span>
+      <span class="badge">Cloud-Native Distributed Systems</span>
       <h1>CloudTask Distributed Engine</h1>
-      <p class="subtitle">A production-grade, cloud-native asynchronous distributed task processing platform inspired by Celery, Sidekiq & AWS SQS.</p>
+      <p class="subtitle">A production-grade, asynchronous distributed task processing platform inspired by Celery, Sidekiq & AWS SQS.</p>
       <div class="status-badge">
         <div class="pulse"></div>
-        <span>All Services Operational (Live on Render)</span>
+        <span>All Services Operational</span>
       </div>
     </div>
 
     <div class="actions">
-      <a href="/docs" class="btn btn-primary">📖 Explore Interactive Swagger UI (/docs)</a>
-      <a href="/redoc" class="btn btn-secondary">📑 API ReDoc</a>
-      <a href="/health/live" class="btn btn-secondary">💚 Health Check</a>
+      <a href="/docs" class="btn btn-primary" target="_blank">📖 Interactive Swagger UI (/docs)</a>
+      <a href="/redoc" class="btn btn-secondary" target="_blank">📑 API ReDoc</a>
+      <button onclick="runLiveHealthCheck()" class="btn btn-secondary" id="health-btn">💚 Live Health Check</button>
+    </div>
+
+    <div id="health-panel">
+      <h4>
+        <span>🟢 Live Diagnostics Result</span>
+        <a href="/health/live" target="_blank" style="color: #9CA3AF; font-size: 0.8rem; text-decoration: underline;">Open Raw JSON ↗</a>
+      </h4>
+      <div id="health-content">Checking services...</div>
     </div>
 
     <div class="grid">
@@ -155,11 +166,44 @@ async def root():
     </div>
 
     <div class="code-box">
-      # Quick Test via cURL:<br>
+      # Test Platform via cURL:<br>
       curl https://cloudtask-platform.onrender.com/health/live<br>
       # Response: {"status": "UP", "service": "api-gateway"}
     </div>
   </div>
+
+  <script>
+    async function runLiveHealthCheck() {
+      const panel = document.getElementById('health-panel');
+      const content = document.getElementById('health-content');
+      const btn = document.getElementById('health-btn');
+      
+      panel.style.display = 'block';
+      btn.innerText = '⏳ Testing...';
+      content.innerHTML = '<span style="color: #FBBF24;">Pinging /health/live and /health/ready...</span>';
+      
+      try {
+        const start = performance.now();
+        const liveRes = await fetch('/health/live');
+        const readyRes = await fetch('/health/ready');
+        const latency = Math.round(performance.now() - start);
+        
+        const liveData = await liveRes.json();
+        const readyData = await readyRes.json();
+        
+        btn.innerText = '✅ Health Verified (' + latency + 'ms)';
+        content.innerHTML = `
+          <p style="margin-bottom: 6px;"><strong>Status:</strong> <span style="color: #34D399;">ONLINE</span> (Latency: ${latency}ms)</p>
+          <p style="margin-bottom: 6px;"><strong>API Gateway:</strong> ${liveData.status === 'UP' ? '✅ UP' : '❌ DOWN'}</p>
+          <p style="margin-bottom: 6px;"><strong>Redis Cache:</strong> ${readyData.redis === 'CONNECTED' ? '✅ CONNECTED' : '⚠️ ' + readyData.redis}</p>
+          <pre>${JSON.stringify({ liveness: liveData, readiness: readyData, latency_ms: latency }, null, 2)}</pre>
+        `;
+      } catch (err) {
+        btn.innerText = '❌ Test Error';
+        content.innerHTML = '<span style="color: #EF4444;">Error testing health: ' + err.message + '</span>';
+      }
+    }
+  </script>
 </body>
 </html>"""
 
