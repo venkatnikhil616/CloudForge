@@ -61,7 +61,7 @@ async def gateway_middleware(request: Request, call_next):
     correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
     set_correlation_id(correlation_id)
 
-    # Rate Limiting check (Section 5.1 in document)
+    # Rate limiting check per client IP (sliding-window Redis limiter)
     client_ip = request.client.host if request.client else "unknown"
     is_allowed = await check_rate_limit(f"ip:{client_ip}", limit=200, window_seconds=60)
     if not is_allowed:
@@ -137,9 +137,9 @@ async def root():
 <body>
   <div class="container">
     <div class="header">
-      <span class="badge">Cloud-Native Distributed Systems</span>
-      <h1>CloudTask Distributed Engine</h1>
-      <p class="subtitle">A production-grade, asynchronous distributed task processing platform inspired by Celery, Sidekiq & AWS SQS.</p>
+      <span class="badge">Distributed Task Engine</span>
+      <h1>CloudTask Platform</h1>
+      <p class="subtitle">High-throughput asynchronous task orchestration, resilient worker execution, and real-time observability.</p>
       <div class="status-badge">
         <div class="pulse"></div>
         <span>All Services Operational</span>

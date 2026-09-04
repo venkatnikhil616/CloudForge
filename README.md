@@ -9,7 +9,7 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Cloud--Native-326CE5.svg)](https://kubernetes.io/)
 [![ArgoCD](https://img.shields.io/badge/GitOps-Argo%20CD-EF7B42.svg)](https://argoproj.github.io/cd/)
 
-CloudTask is a cloud-native, distributed asynchronous task processing platform inspired by enterprise systems such as Celery, Sidekiq, and AWS SQS. Built with **Python (FastAPI)**, **PostgreSQL**, **Redis**, and **RabbitMQ**, CloudTask demonstrates production distributed systems engineering, at-least-once delivery with idempotent execution, exponential backoff retries, dead-letter queueing, GitOps automation, and full observability.
+CloudTask is a high-throughput, distributed asynchronous task orchestration and execution platform designed for modern microservice architectures. Built with **Python (FastAPI)**, **PostgreSQL**, **Redis**, and **RabbitMQ**, CloudTask guarantees durable at-least-once message processing, distributed two-tier idempotency, priority scheduling, automated exponential backoff retries, Dead-Letter Queue (DLQ) redrive, and comprehensive observability.
 
 ---
 
@@ -103,8 +103,11 @@ CloudTask is a cloud-native, distributed asynchronous task processing platform i
 │   ├── prometheus/             # Prometheus scrape configs & alert rules
 │   ├── grafana/                # Provisioned Grafana datasources & dashboards
 │   └── loki/                   # Structured logging aggregation configs
+├── sdk/                        # Official CloudTask Python Client SDK
+│   └── cloudtask/              # Async/sync client with retry & signature verification
+├── examples/                   # Practical integration examples & workflow scripts
 ├── docs/
-│   ├── adr/                    # 8 Architecture Decision Records (ADRs)
+│   ├── adr/                    # Architecture Decision Records (ADRs)
 │   ├── architecture/           # System architecture diagrams & state machine
 │   ├── api/                    # OpenAPI endpoint specifications
 │   ├── deployment/             # Deployment runbooks for Docker and K8s
@@ -169,6 +172,9 @@ Key architectural choices are formally documented under [`docs/adr/`](docs/adr/)
 - [ADR 006: Ephemeral Redis Caching & Locking](docs/adr/006-redis-usage.md)
 - [ADR 007: Kubernetes Orchestration](docs/adr/007-kubernetes.md)
 - [ADR 008: GitOps Deployment with Argo CD](docs/adr/008-gitops-argo-cd.md)
+- [ADR 009: DAG Workflow Orchestration](docs/adr/009-dag-workflow-orchestration.md)
+- [ADR 010: Realtime Streaming & Task Preemption](docs/adr/010-realtime-streaming-and-preemption.md)
+- [ADR 011: Enterprise Task Patterns](docs/adr/011-enterprise-task-patterns.md)
 
 ---
 

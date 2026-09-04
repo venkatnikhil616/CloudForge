@@ -12,7 +12,7 @@ COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
-# Create non-root user for security (Section 23 in document)
+# Non-root user for security best practices
 RUN groupadd -r cloudtask && useradd -r -g cloudtask cloudtask
 
 COPY pkg/ /app/pkg/

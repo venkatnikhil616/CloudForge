@@ -72,7 +72,7 @@ async def logging_and_metrics_middleware(request: Request, call_next):
 app.include_router(auth_router)
 
 
-# Kubernetes Health Probes (Section 19 in document)
+# Kubernetes health and readiness probes
 @app.get("/health/live", tags=["Health"])
 async def liveness():
     """Liveness probe: Checks if the container process is alive."""
