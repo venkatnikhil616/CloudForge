@@ -28,7 +28,12 @@ try:
         TaskListResponse,
         TaskResponse,
     )
-except ImportError:
+except (ImportError, Exception):
+    import sys
+    from pathlib import Path
+    _svc_dir = str(Path(__file__).resolve().parent)
+    if _svc_dir not in sys.path:
+        sys.path.insert(0, _svc_dir)
     from schemas import (
         BatchCreateTasksRequest,
         BatchTaskResponse,
@@ -632,25 +637,66 @@ async def set_execution_mode_endpoint(request: Request):
 @router.post("/start-processing")
 async def start_processing_endpoint(db: AsyncSession = Depends(get_db_session)):
     """
-    Triggers execution of all currently QUEUED tasks strictly in Priority Order (P10 -> P1).
+    Triggers execution of all currently QUEUED or ready PENDING tasks strictly in Priority Order (P10 -> P1).
     Tasks are processed sequentially with visual pacing to clearly demonstrate priority scheduling.
     """
     from services.worker.main import process_priority_queue
 
-    stmt = select(Task).where(Task.status == TaskStatus.QUEUED).order_by(Task.priority.desc(), Task.created_at.asc())
-    queued_tasks = (await db.execute(stmt)).scalars().all()
+    stmt = (
+        select(Task)
+        .where(Task.status.in_([TaskStatus.QUEUED, TaskStatus.PENDING]))
+        .order_by(Task.priority.desc(), Task.created_at.asc())
+    )
+    waiting_tasks = (await db.execute(stmt)).scalars().all()
 
-    if not queued_tasks:
+    if not waiting_tasks:
         return {"status": "idle", "message": "No tasks currently waiting in the queue.", "queued_count": 0}
+
+    # Promote ready PENDING tasks to QUEUED for execution
+    for t in waiting_tasks:
+        if t.status == TaskStatus.PENDING:
+            t.status = TaskStatus.QUEUED
+    await db.commit()
 
     # Launch priority execution in background task
     asyncio.create_task(process_priority_queue())
 
-    sequence = [{"id": t.id, "title": t.title, "priority": t.priority} for t in queued_tasks]
+    sequence = [{"id": t.id, "title": t.title, "priority": t.priority} for t in waiting_tasks]
     return {
         "status": "started",
-        "message": f"Started processing {len(queued_tasks)} tasks strictly in descending priority order (P10 -> P1).",
-        "queued_count": len(queued_tasks),
+        "message": f"Started processing {len(waiting_tasks)} tasks strictly in descending priority order (P10 -> P1).",
+        "queued_count": len(waiting_tasks),
         "priority_order": sequence,
     }
+
+
+@router.post("/clear-history")
+@router.delete("/history")
+async def clear_history_endpoint(db: AsyncSession = Depends(get_db_session)):
+    """
+    Clears all historical tasks with status SUCCESS or CANCELLED from the database.
+    Also cascades deletions to associated worker attempt records.
+    """
+    from pkg.models.attempt import TaskAttempt
+    from sqlalchemy import delete
+
+    stmt = select(Task.id).where(Task.status.in_([TaskStatus.SUCCESS, TaskStatus.CANCELLED]))
+    task_ids = (await db.execute(stmt)).scalars().all()
+
+    if not task_ids:
+        return {"status": "ok", "deleted_count": 0, "message": "No historical tasks to clear."}
+
+    # Clean up associated attempt logs and tasks
+    await db.execute(delete(TaskAttempt).where(TaskAttempt.task_id.in_(task_ids)))
+    del_stmt = delete(Task).where(Task.id.in_(task_ids))
+    await db.execute(del_stmt)
+    await db.commit()
+
+    logger.info(f"Cleared {len(task_ids)} completed/cancelled tasks from history.")
+    return {
+        "status": "ok",
+        "deleted_count": len(task_ids),
+        "message": f"Successfully cleared {len(task_ids)} historical tasks."
+    }
+
 

@@ -124,7 +124,7 @@ async def execute_task(task_payload: Dict[str, Any]) -> Tuple[bool, bool]:
             task.current_attempt += 1
             attempt_number = task.current_attempt
             task.status = TaskStatus.RUNNING
-            task.progress = 10
+            task.progress = 25
             task.trace_id = trace_id
             await db.commit()
 
@@ -140,7 +140,9 @@ async def execute_task(task_payload: Dict[str, Any]) -> Tuple[bool, bool]:
             db.add(attempt)
             await db.commit()
 
-            await publish_progress(task_id, 15, "RUNNING", "Worker picked task, starting execution...")
+            await publish_progress(task_id, 25, "RUNNING", "Worker picked task, starting execution...")
+            # Pacing to guarantee visual presence in RUNNING column for live dashboard
+            await asyncio.sleep(0.4)
 
             # 2. Worker Preemption: setup abort listener
             abort_pubsub = None
@@ -191,10 +193,11 @@ async def execute_task(task_payload: Dict[str, Any]) -> Tuple[bool, bool]:
                             result = finished.result()
                             success = True
 
-                # Progress 75%
-                task.progress = 75
+                # Progress 70%
+                task.progress = 70
                 await db.commit()
-                await publish_progress(task_id, 75, "RUNNING", "Computation complete, persisting results...")
+                await publish_progress(task_id, 70, "RUNNING", "Computation complete, persisting results...")
+                await asyncio.sleep(0.3)
 
             except asyncio.TimeoutError:
                 error_message = f"Task exceeded timeout limit of {task.timeout_seconds} seconds"

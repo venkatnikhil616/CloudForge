@@ -44,13 +44,13 @@ async def handle_notification(event_type: str, data: dict):
     webhook_url = data.get("webhook_url")
 
     if status == "SUCCESS":
-        subject = f"✅ Task Completed: {title}"
+        subject = f"Task Completed: {title}"
         body = f"Your task '{title}' (ID: {task_id}) finished successfully in {data.get('duration_ms', 0)}ms."
     elif status == "DEAD_LETTERED":
-        subject = f"🚨 Task Failed (DLQ): {title}"
+        subject = f"Task Failed (DLQ): {title}"
         body = f"Your task '{title}' (ID: {task_id}) permanently failed: {data.get('error', 'Unknown error')}."
     else:
-        subject = f"ℹ️ CloudTask Update: {title}"
+        subject = f"CloudTask Update: {title}"
         body = f"Task '{title}' (ID: {task_id}) changed state to {status}."
 
     logger.info(f"[DISPATCH EMAIL] Subject: {subject} | Recipient: user-{user_id}@cloudtask.dev")

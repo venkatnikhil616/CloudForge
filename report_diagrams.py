@@ -272,8 +272,8 @@ def fig_dashboard_mockup():
     
     # Top navbar
     d.add(Rect(5, 115, 510, 25, fillColor=HexColor("#1E293B"), strokeColor=HexColor("#334155"), strokeWidth=1, rx=3, ry=3))
-    d.add(String(20, 126, "⚡ CloudTask Realtime Operations Dashboard", fontName="Helvetica-Bold", fontSize=8.5, fillColor=HexColor("#38BDF8")))
-    d.add(String(410, 126, "🟢 Operational | Live Render", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#4ADE80")))
+    d.add(String(20, 126, "CloudTask Realtime Operations Dashboard", fontName="Helvetica-Bold", fontSize=8.5, fillColor=HexColor("#38BDF8")))
+    d.add(String(410, 126, "Operational | Live Render", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#4ADE80")))
     
     # 4 metric cards
     cards = [
@@ -290,10 +290,10 @@ def fig_dashboard_mockup():
     # Quick actions bar
     d.add(Rect(15, 25, 490, 36, fillColor=HexColor("#1E293B"), strokeColor=HexColor("#334155"), strokeWidth=1, rx=4, ry=4))
     d.add(Rect(25, 31, 85, 24, fillColor=HexColor("#0284C7"), strokeColor=HexColor("#0369A1"), strokeWidth=1, rx=3, ry=3))
-    d.add(String(67, 41, "➕ New Task", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+    d.add(String(67, 41, "New Task", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
     
     d.add(Rect(120, 31, 85, 24, fillColor=HexColor("#10B981"), strokeColor=HexColor("#047857"), strokeWidth=1, rx=3, ry=3))
-    d.add(String(162, 41, "📥 Export CSV", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+    d.add(String(162, 41, "Export CSV", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
     
     d.add(Rect(215, 31, 85, 24, fillColor=HexColor("#EF4444"), strokeColor=HexColor("#B91C1C"), strokeWidth=1, rx=3, ry=3))
     d.add(String(257, 41, "Replay All (DLQ)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))

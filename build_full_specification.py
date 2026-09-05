@@ -985,8 +985,8 @@ def build_pdf(filename):
     story.append(Paragraph("Accessible at <code>https://cloudtask-platform.onrender.com/dashboard</code>, the operational dashboard delivers real-time cluster monitoring and administrative task orchestration:", body))
     story.append(Paragraph("• <b>Live Health Cards:</b> Displays pending tasks, active processing workers, completed executions, and DLQ counts with sub-3-second auto-polling updates.", bullet))
     story.append(Paragraph("• <b>Quick Task Dispatcher:</b> Provides an intuitive form to schedule background jobs with custom titles, task types, priorities (1–10), and JSON payloads directly from the browser.", bullet))
-    story.append(Paragraph("• <b>📥 One-Click CSV Audit Export:</b> Streams the complete historical execution log as an RFC 4180 compliant CSV file for audit reporting.", bullet))
-    story.append(Paragraph("• <b>🔄 DLQ Replay All:</b> Redrives all dead-lettered poison pills back into worker priority queues with 1 click.", bullet))
+    story.append(Paragraph("• <b>One-Click CSV Audit Export:</b> Streams the complete historical execution log as an RFC 4180 compliant CSV file for audit reporting.", bullet))
+    story.append(Paragraph("• <b>DLQ Replay All:</b> Redrives all dead-lettered poison pills back into worker priority queues with 1 click.", bullet))
     story.append(PageBreak())
 
     # ==================== PAGE 31 ====================

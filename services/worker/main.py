@@ -113,12 +113,18 @@ async def process_priority_queue() -> int:
         async with AsyncSessionLocal() as session:
             stmt = (
                 select(Task)
-                .where(Task.status == TaskStatus.QUEUED)
+                .where(Task.status.in_([TaskStatus.QUEUED, TaskStatus.PENDING]))
                 .order_by(Task.priority.desc(), Task.created_at.asc())
             )
             tasks = (await session.execute(stmt)).scalars().all()
             if not tasks:
                 return 0
+
+            # Promote any PENDING tasks to QUEUED
+            for t in tasks:
+                if t.status == TaskStatus.PENDING:
+                    t.status = TaskStatus.QUEUED
+            await session.commit()
 
             task_list = [
                 {
@@ -143,7 +149,7 @@ async def process_priority_queue() -> int:
             try:
                 await execute_task(task_dict)
                 # Pacing between tasks so UI updates reflect priority progression
-                await asyncio.sleep(0.8)
+                await asyncio.sleep(0.5)
             except Exception as ex:
                 logger.error(f"Error processing priority task {task_dict['id']}: {ex}")
 

@@ -203,34 +203,34 @@ async def root():
     </div>
 
     <div class="actions">
-      <a href="/dashboard" class="btn btn-primary" style="background:#10B981;box-shadow:0 4px 14px rgba(16,185,129,0.35);">📊 Real-Time Task Dashboard</a>
-      <a href="/docs" class="btn btn-primary">📖 Swagger UI (/docs)</a>
-      <button onclick="runLiveHealthCheck()" class="btn btn-secondary" id="health-btn">💚 Live Health Check</button>
+      <a href="/dashboard" class="btn btn-primary" style="background:#10B981;box-shadow:0 4px 14px rgba(16,185,129,0.35);">Real-Time Task Dashboard</a>
+      <a href="/docs" class="btn btn-primary">Swagger UI (/docs)</a>
+      <button onclick="runLiveHealthCheck()" class="btn btn-secondary" id="health-btn">Live Diagnostics Check</button>
     </div>
 
     <div id="health-panel">
       <h4>
-        <span>🟢 Live Diagnostics Result</span>
-        <button type="button" onclick="copyHealthJson()" id="copy-btn" style="background:#1E293B;color:#94A3B8;border:1px solid #334155;border-radius:4px;padding:4px 10px;font-size:0.75rem;cursor:pointer;font-weight:500;">📋 Copy JSON</button>
+        <span>Live Diagnostics Result</span>
+        <button type="button" onclick="copyHealthJson()" id="copy-btn" style="background:#1E293B;color:#94A3B8;border:1px solid #334155;border-radius:4px;padding:4px 10px;font-size:0.75rem;cursor:pointer;font-weight:500;">Copy JSON</button>
       </h4>
       <div id="health-content">Checking services...</div>
     </div>
 
     <div class="grid">
       <div class="card">
-        <h3>🛡️ At-Least-Once Delivery</h3>
+        <h3>At-Least-Once Delivery</h3>
         <p>Reliable message execution with Redis distributed mutex locking & PostgreSQL idempotency keys.</p>
       </div>
       <div class="card">
-        <h3>🔁 Exponential Retries & DLQ</h3>
+        <h3>Exponential Retries & DLQ</h3>
         <p>Automated exponential backoff retries with dead-letter queueing for poisoned messages.</p>
       </div>
       <div class="card">
-        <h3>⚡ Priority Task Queuing</h3>
+        <h3>Priority Task Queuing</h3>
         <p>RabbitMQ priority queues (1-10) with multi-worker concurrent dispatching.</p>
       </div>
       <div class="card">
-        <h3>🔒 Stateless JWT Security</h3>
+        <h3>Stateless JWT Security</h3>
         <p>Bcrypt password hashing, token validation, rate limiting & correlation ID tracking.</p>
       </div>
     </div>
@@ -249,8 +249,8 @@ async def root():
       if (lastHealthJson && navigator.clipboard) {
         navigator.clipboard.writeText(lastHealthJson);
         const btn = document.getElementById('copy-btn');
-        btn.innerText = '✅ Copied!';
-        setTimeout(() => { btn.innerText = '📋 Copy JSON'; }, 2000);
+        btn.innerText = 'Copied!';
+        setTimeout(() => { btn.innerText = 'Copy JSON'; }, 2000);
       }
     }
 
@@ -260,7 +260,7 @@ async def root():
       const btn = document.getElementById('health-btn');
       
       panel.style.display = 'block';
-      btn.innerText = '⏳ Testing...';
+      btn.innerText = 'Testing...';
       content.innerHTML = '<span style="color: #FBBF24;">Pinging /health/live and /health/ready...</span>';
       
       try {
@@ -273,15 +273,15 @@ async def root():
         const readyData = await readyRes.json();
         
         lastHealthJson = JSON.stringify({ liveness: liveData, readiness: readyData, latency_ms: latency }, null, 2);
-        btn.innerText = '✅ Health Verified (' + latency + 'ms)';
+        btn.innerText = 'Health Verified (' + latency + 'ms)';
         content.innerHTML = `
           <p style="margin-bottom: 6px;"><strong>Status:</strong> <span style="color: #34D399;">ONLINE</span> (Latency: ${latency}ms)</p>
-          <p style="margin-bottom: 6px;"><strong>API Gateway:</strong> ${liveData.status === 'UP' ? '✅ UP' : '❌ DOWN'}</p>
-          <p style="margin-bottom: 6px;"><strong>Redis Cache:</strong> ${readyData.redis === 'CONNECTED' ? '✅ CONNECTED' : '⚠️ ' + readyData.redis}</p>
+          <p style="margin-bottom: 6px;"><strong>API Gateway:</strong> ${liveData.status === 'UP' ? 'UP' : 'DOWN'}</p>
+          <p style="margin-bottom: 6px;"><strong>Redis Cache:</strong> ${readyData.redis === 'CONNECTED' ? 'CONNECTED' : readyData.redis}</p>
           <pre>${lastHealthJson}</pre>
         `;
       } catch (err) {
-        btn.innerText = '❌ Test Error';
+        btn.innerText = 'Test Error';
         content.innerHTML = '<span style="color: #EF4444;">Error testing health: ' + err.message + '</span>';
       }
     }
@@ -301,7 +301,7 @@ async def custom_swagger_ui_html():
     top_bar = """
     <div style="background:#0B0F19;border-bottom:1px solid #1F2937;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:99999;font-family:system-ui, -apple-system, sans-serif;flex-wrap:wrap;gap:8px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-weight:700;color:#FFFFFF;font-size:0.95rem;letter-spacing:-0.02em;">⚡ CloudTask API Explorer</span>
+        <span style="font-weight:700;color:#FFFFFF;font-size:0.95rem;letter-spacing:-0.02em;">CloudTask API Explorer</span>
         <span style="background:rgba(59,130,246,0.15);color:#60A5FA;padding:2px 8px;border-radius:9999px;font-size:0.7rem;font-weight:600;border:1px solid rgba(59,130,246,0.3);">Swagger UI</span>
       </div>
       <a href="/" style="background:#2563EB;color:#FFFFFF;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(37,99,235,0.4);transition:background 0.2s;">
@@ -389,12 +389,18 @@ async def real_time_dashboard():
     .tab-pill.active { background: #2563EB; color: #fff; border-color: #3B82F6; }
 
     /* Kanban Grid */
-    .kanban-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: flex-start; }
-    .kanban-col { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; min-height: 380px; }
-    .col-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--card-border); margin-bottom: 12px; font-weight: 700; font-size: 0.88rem; }
+    .kanban-board-wrapper { width: 100%; overflow-x: auto; padding-bottom: 12px; }
+    .kanban-grid { display: grid; grid-template-columns: repeat(4, minmax(260px, 1fr)); gap: 14px; align-items: stretch; min-width: 1080px; }
+    .kanban-col { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; height: 640px; max-height: 72vh; box-sizing: border-box; }
+    .col-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--card-border); margin-bottom: 12px; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; flex-shrink: 0; }
+    .kanban-tasks { flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 4px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .kanban-tasks::-webkit-scrollbar { width: 6px; }
+    .kanban-tasks::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.4); border-radius: 4px; }
+    .kanban-tasks::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .kanban-tasks::-webkit-scrollbar-thumb:hover { background: #475569; }
 
     /* Task Card */
-    .task-card { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; margin-bottom: 10px; transition: all 0.2s; cursor: pointer; }
+    .task-card { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; margin-bottom: 10px; transition: all 0.2s; cursor: pointer; flex-shrink: 0; }
     .task-card:hover { border-color: #3B82F6; transform: translateY(-1px); }
     .task-title { font-weight: 600; font-size: 0.88rem; color: #FFFFFF; margin-bottom: 6px; word-break: break-word; }
     .task-meta { font-size: 0.72rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -431,8 +437,10 @@ async def real_time_dashboard():
       .container { max-width: 100%; }
       .metrics-bar { grid-template-columns: repeat(2, 1fr); }
       .mobile-tabs { display: flex; }
-      .kanban-grid { grid-template-columns: 1fr; }
-      .kanban-col { min-height: auto; }
+      .kanban-board-wrapper { overflow-x: visible; }
+      .kanban-grid { grid-template-columns: 1fr; min-width: 0; }
+      .kanban-col { height: auto; max-height: none; min-height: 250px; }
+      .kanban-tasks { max-height: 480px; }
       .kanban-col.mobile-hidden { display: none !important; }
       .filter-toolbar { flex-direction: column; align-items: stretch; }
       .search-box { width: 100%; }
@@ -456,7 +464,7 @@ async def real_time_dashboard():
     <!-- Navbar -->
     <div class="nav">
       <div class="nav-brand">
-        <span>⚡ CloudTask Engine</span>
+        <span>CloudTask Engine</span>
         <div class="status-pill">
           <div class="pulse-dot"></div>
           <span>Active</span>
@@ -464,18 +472,18 @@ async def real_time_dashboard():
       </div>
       <div class="nav-links">
         <a href="/" class="btn btn-secondary">← Portal</a>
-        <a href="/docs" class="btn btn-secondary">📖 API Docs</a>
-        <button onclick="toggleExecutionMode()" class="btn btn-secondary" id="mode-toggle-btn" title="Toggle between manual batch staging and instant auto-dispatch" style="border: 1px solid #3B82F6; color: #93C5FD;">⚙️ Mode: <span id="mode-badge" style="font-weight:700; color:#38BDF8;">Manual (Staged)</span></button>
-        <button onclick="startPriorityProcessing()" class="btn btn-success" id="start-btn" style="background:#10B981; box-shadow:0 0 14px rgba(16,185,129,0.4); font-weight:700; padding:8px 16px;">▶️ Start Processing (<span id="start-count">0</span>)</button>
-        <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">📥 Export CSV</button>
-        <button onclick="toggleDispatcher()" class="btn btn-primary" id="toggle-dispatch-btn">➕ New Task</button>
-        <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">🔄</button>
+        <a href="/docs" class="btn btn-secondary">API Docs</a>
+        <button onclick="toggleExecutionMode()" class="btn btn-secondary" id="mode-toggle-btn" title="Toggle between manual batch staging and instant auto-dispatch" style="border: 1px solid #3B82F6; color: #93C5FD;">Mode: <span id="mode-badge" style="font-weight:700; color:#38BDF8;">Manual (Staged)</span></button>
+        <button onclick="startPriorityProcessing()" class="btn btn-success" id="start-btn" style="background:#10B981; box-shadow:0 0 14px rgba(16,185,129,0.4); font-weight:700; padding:8px 16px;">Start Processing (<span id="start-count">0</span>)</button>
+        <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">Export CSV</button>
+        <button onclick="toggleDispatcher()" class="btn btn-primary" id="toggle-dispatch-btn">New Task</button>
+        <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">Refresh</button>
       </div>
     </div>
 
     <!-- Cluster Fleet Summary Banner -->
     <div class="cluster-banner" id="status-banner">
-      <div id="mode-guidance-text"><strong>⏸️ Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>▶️ Start Processing</strong> to execute in priority order (P10 ➔ P1).</div>
+      <div id="mode-guidance-text"><strong>Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>Start Processing</strong> to execute in priority order (P10 to P1).</div>
       <div id="filter-count-badge" style="font-weight:600;">Showing 0 tasks</div>
     </div>
 
@@ -506,7 +514,6 @@ async def real_time_dashboard():
     <!-- Filter & Search Toolbar -->
     <div class="filter-toolbar">
       <div class="search-box">
-        <span>🔍</span>
         <input type="text" id="task-search" placeholder="Search tasks by title, ID, or trace..." oninput="handleSearch(this.value)" />
       </div>
       <div class="filter-selects">
@@ -530,7 +537,7 @@ async def real_time_dashboard():
     <!-- Quick Dispatcher Form -->
     <div class="dispatch-box" id="dispatch-panel" style="display: block;">
       <h3>
-        <span>🚀 Dispatch Asynchronous Task to Cluster</span>
+        <span>Dispatch Asynchronous Task to Cluster</span>
       </h3>
       <form id="task-form" onsubmit="handleDispatch(event)">
         <div class="form-grid">
@@ -550,8 +557,8 @@ async def real_time_dashboard():
           <div class="form-group">
             <label>Priority</label>
             <select id="task-priority" class="form-control">
-              <option value="10">10 - Critical Priority 🔥</option>
-              <option value="8" selected>8 - High Priority ⚡</option>
+              <option value="10">10 - Critical Priority</option>
+              <option value="8" selected>8 - High Priority</option>
               <option value="5">5 - Normal Priority</option>
               <option value="1">1 - Low Priority</option>
             </select>
@@ -566,7 +573,7 @@ async def real_time_dashboard():
           </div>
           <div class="form-group" style="align-self: flex-end;">
             <button type="submit" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
-              ⚡ Enqueue Task
+              Enqueue Task
             </button>
           </div>
         </div>
@@ -576,47 +583,54 @@ async def real_time_dashboard():
     <!-- Mobile Segmented Tabs -->
     <div class="mobile-tabs" id="mobile-tabs">
       <button class="tab-pill active" onclick="setMobileView('ALL')">All (<span id="m-all">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('QUEUED')">🟡 Queued (<span id="m-queued">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('RUNNING')">🔵 Running (<span id="m-running">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('SUCCESS')">🟢 Success (<span id="m-success">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('DEAD_LETTERED')">🔴 DLQ (<span id="m-dlq">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('QUEUED')">Queued (<span id="m-queued">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('RUNNING')">Running (<span id="m-running">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('SUCCESS')">Success (<span id="m-success">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('DEAD_LETTERED')">DLQ (<span id="m-dlq">0</span>)</button>
     </div>
 
     <!-- Kanban Grid -->
-    <div class="kanban-grid">
-      <div class="kanban-col" id="col-container-queued">
-        <div class="col-header">
-          <div style="display:flex; align-items:center; gap:6px;">
-            <span>🟡 QUEUED / STAGED</span>
-            <span id="badge-queued" class="tag">0</span>
+    <div class="kanban-board-wrapper">
+      <div class="kanban-grid">
+        <div class="kanban-col" id="col-container-queued">
+          <div class="col-header">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>QUEUED / STAGED</span>
+              <span id="badge-queued" class="tag">0</span>
+            </div>
+            <button onclick="startPriorityProcessing()" class="btn btn-success btn-xs" id="col-start-btn" style="background:#10B981; padding:3px 8px; font-weight:700;" title="Run all queued tasks in Priority Order">Process Queue</button>
           </div>
-          <button onclick="startPriorityProcessing()" class="btn btn-success btn-xs" id="col-start-btn" style="background:#10B981; padding:3px 8px; font-weight:700;" title="Run all queued tasks in Priority Order">▶️ Process Queue</button>
+          <div id="col-queued" class="kanban-tasks"></div>
         </div>
-        <div id="col-queued"></div>
-      </div>
-      <div class="kanban-col" id="col-container-running">
-        <div class="col-header">
-          <span>🔵 RUNNING (Worker)</span>
-          <span id="badge-running" class="tag">0</span>
-        </div>
-        <div id="col-running"></div>
-      </div>
-      <div class="kanban-col" id="col-container-success">
-        <div class="col-header">
-          <span>🟢 COMPLETED</span>
-          <span id="badge-success" class="tag">0</span>
-        </div>
-        <div id="col-success"></div>
-      </div>
-      <div class="kanban-col" id="col-container-dlq">
-        <div class="col-header">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span>🔴 DEAD_LETTERED / FAILED</span>
-            <span id="badge-dlq" class="tag">0</span>
+        <div class="kanban-col" id="col-container-running">
+          <div class="col-header">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>RUNNING (Worker)</span>
+              <span id="badge-running" class="tag">0</span>
+            </div>
           </div>
-          <button id="replay-all-btn" onclick="replayAllDLQ()" class="btn btn-danger btn-xs" title="Replay all DLQ tasks" style="padding: 2px 7px;">Replay All</button>
+          <div id="col-running" class="kanban-tasks"></div>
         </div>
-        <div id="col-dlq"></div>
+        <div class="kanban-col" id="col-container-success">
+          <div class="col-header">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>COMPLETED</span>
+              <span id="badge-success" class="tag">0</span>
+            </div>
+            <button onclick="clearHistory()" class="btn btn-secondary btn-xs" id="clear-history-btn" title="Clear completed tasks history" style="padding:2px 8px; font-weight:600;">Clear History</button>
+          </div>
+          <div id="col-success" class="kanban-tasks"></div>
+        </div>
+        <div class="kanban-col" id="col-container-dlq">
+          <div class="col-header">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>DEAD_LETTERED / FAILED</span>
+              <span id="badge-dlq" class="tag">0</span>
+            </div>
+            <button id="replay-all-btn" onclick="replayAllDLQ()" class="btn btn-danger btn-xs" title="Replay all DLQ tasks" style="padding: 2px 7px;">Replay All</button>
+          </div>
+          <div id="col-dlq" class="kanban-tasks"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -629,7 +643,7 @@ async def real_time_dashboard():
           <span id="modal-status-badge" class="tag">STATUS</span>
           <h3 id="modal-title">Task Inspection</h3>
         </div>
-        <button type="button" class="modal-close" onclick="closeTaskModal()">✕</button>
+        <button type="button" class="modal-close" onclick="closeTaskModal()">&times;</button>
       </div>
       <div class="modal-body">
         <!-- Metadata Grid -->
@@ -638,14 +652,14 @@ async def real_time_dashboard():
             <div class="detail-label">Task ID</div>
             <div class="detail-val">
               <span id="modal-task-id" style="font-size:0.75rem;">-</span>
-              <button onclick="copyModalField('modal-task-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">📋 Copy</button>
+              <button onclick="copyModalField('modal-task-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">Copy</button>
             </div>
           </div>
           <div class="detail-item">
             <div class="detail-label">Distributed Trace ID</div>
             <div class="detail-val">
               <span id="modal-trace-id" style="font-size:0.75rem;">-</span>
-              <button onclick="copyModalField('modal-trace-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">📋 Copy</button>
+              <button onclick="copyModalField('modal-trace-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">Copy</button>
             </div>
           </div>
           <div class="detail-item">
@@ -861,16 +875,16 @@ async def real_time_dashboard():
 
         let delayBadge = '';
         if (task.delay_seconds && task.delay_seconds > 0) {
-          delayBadge = `<span class="tag tag-delay">⏳ ${task.delay_seconds}s</span>`;
+          delayBadge = `<span class="tag tag-delay">Delay: ${task.delay_seconds}s</span>`;
         }
         let webhookBadge = '';
         if (task.webhook_url) {
-          webhookBadge = `<span class="tag tag-wh" title="${task.webhook_url}">🔗 Hook</span>`;
+          webhookBadge = `<span class="tag tag-wh" title="${task.webhook_url}">Webhook</span>`;
         }
 
         let actionHtml = `
           <div class="card-actions">
-            <button onclick="openTaskModal('${task.id}')" class="btn btn-secondary btn-xs">🔍 Inspect</button>
+            <button onclick="openTaskModal('${task.id}')" class="btn btn-secondary btn-xs">Inspect</button>
         `;
         if (status === 'QUEUED' || status === 'RUNNING' || status === 'PENDING') {
           actionHtml += `<button onclick="cancelTask('${task.id}')" class="btn btn-danger btn-xs">Cancel</button>`;
@@ -905,6 +919,11 @@ async def real_time_dashboard():
         else if (status === 'SUCCESS') cols.SUCCESS.appendChild(card);
         else cols.DEAD_LETTERED.appendChild(card);
       });
+
+      if (counts.queued === 0) cols.QUEUED.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">No queued tasks</div>';
+      if (counts.running === 0) cols.RUNNING.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">No running tasks</div>';
+      if (counts.success === 0) cols.SUCCESS.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">No completed tasks</div>';
+      if (counts.dlq === 0) cols.DEAD_LETTERED.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">DLQ is empty</div>';
 
       // Update counters
       document.getElementById('total-count').innerText = counts.total;
@@ -1027,8 +1046,8 @@ async def real_time_dashboard():
       const text = document.getElementById(elementId).innerText;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(text);
-        btn.innerText = '✅ Copied';
-        setTimeout(() => btn.innerText = '📋 Copy', 1500);
+        btn.innerText = 'Copied';
+        setTimeout(() => btn.innerText = 'Copy', 1500);
       }
     }
 
@@ -1036,7 +1055,7 @@ async def real_time_dashboard():
       e.preventDefault();
       const btn = document.getElementById('submit-btn');
       btn.disabled = true;
-      btn.innerText = '⏳ Dispatching...';
+      btn.innerText = 'Dispatching...';
 
       let token = await ensureAuth();
       let title = document.getElementById('task-title').value.trim();
@@ -1084,22 +1103,22 @@ async def real_time_dashboard():
           document.getElementById('task-title').value = '';
           document.getElementById('task-webhook').value = '';
           document.getElementById('task-delay').value = '0';
-          btn.innerText = '✅ Enqueued!';
+          btn.innerText = 'Enqueued';
           setTimeout(() => {
             btn.disabled = false;
-            btn.innerText = '⚡ Enqueue Task';
+            btn.innerText = 'Enqueue Task';
           }, 1500);
           fetchTasks();
         } else {
           const errData = await res.json().catch(() => ({}));
           alert('Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.'));
           btn.disabled = false;
-          btn.innerText = '⚡ Enqueue Task';
+          btn.innerText = 'Enqueue Task';
         }
       } catch (err) {
         alert('Dispatch error: ' + err.message);
         btn.disabled = false;
-        btn.innerText = '⚡ Enqueue Task';
+        btn.innerText = 'Enqueue Task';
       }
     }
 
@@ -1108,7 +1127,7 @@ async def real_time_dashboard():
       const originalText = btn ? btn.innerText : 'Replay All';
       if (btn) {
         btn.disabled = true;
-        btn.innerText = '⏳ Replaying...';
+        btn.innerText = 'Replaying...';
       }
       try {
         let token = await ensureAuth();
@@ -1125,7 +1144,7 @@ async def real_time_dashboard():
         }
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
-          if (btn) btn.innerText = '✅ Replayed!';
+          if (btn) btn.innerText = 'Replayed';
           setTimeout(() => { if (btn) { btn.disabled = false; btn.innerText = originalText; } }, 1500);
           fetchTasks();
         } else {
@@ -1141,7 +1160,7 @@ async def real_time_dashboard():
     async function exportTasksCsv() {
       let token = await ensureAuth();
       const btn = document.getElementById('export-btn');
-      btn.innerText = '⏳ Exporting...';
+      btn.innerText = 'Exporting...';
       try {
         let res = await fetch('/api/v1/tasks/export?format=csv', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -1161,16 +1180,16 @@ async def real_time_dashboard():
           document.body.appendChild(a);
           a.click();
           a.remove();
-          btn.innerText = '✅ Exported!';
+          btn.innerText = 'Exported';
         } else {
           exportClientSideCsv();
-          btn.innerText = '✅ Exported!';
+          btn.innerText = 'Exported';
         }
       } catch (err) {
         exportClientSideCsv();
-        btn.innerText = '✅ Exported!';
+        btn.innerText = 'Exported';
       }
-      setTimeout(() => btn.innerText = '📥 Export CSV', 2000);
+      setTimeout(() => btn.innerText = 'Export CSV', 2000);
     }
 
     function exportClientSideCsv() {
@@ -1251,19 +1270,19 @@ async def real_time_dashboard():
       const guidance = document.getElementById('mode-guidance-text');
       if (currentExecutionMode === 'auto') {
         if (badge) {
-          badge.innerText = 'Auto-Start ⚡';
+          badge.innerText = 'Auto-Start';
           badge.style.color = '#34D399';
         }
         if (guidance) {
-          guidance.innerHTML = '<strong>⚡ Auto-Start Mode:</strong> Tasks execute automatically in background as soon as they are submitted.';
+          guidance.innerHTML = '<strong>Auto-Start Mode:</strong> Tasks execute automatically in background as soon as they are submitted.';
         }
       } else {
         if (badge) {
-          badge.innerText = 'Manual (Staged) ⏸️';
+          badge.innerText = 'Manual (Staged)';
           badge.style.color = '#38BDF8';
         }
         if (guidance) {
-          guidance.innerHTML = '<strong>⏸️ Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>▶️ Start Processing</strong> to execute in priority order (P10 ➔ P1).';
+          guidance.innerHTML = '<strong>Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>Start Processing</strong> to execute in priority order (P10 to P1).';
         }
       }
     }
@@ -1290,6 +1309,66 @@ async def real_time_dashboard():
       }
     }
 
+    async function clearHistory() {
+      const btn = document.getElementById('clear-history-btn');
+      const originalText = btn ? btn.innerText : 'Clear History';
+      const successCount = parseInt(document.getElementById('success-count').innerText || '0');
+      if (successCount === 0) {
+        alert('No completed tasks in history to clear.');
+        return;
+      }
+      if (!confirm(`Are you sure you want to clear ${successCount} completed tasks from history?`)) {
+        return;
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Clearing...';
+      }
+      try {
+        let token = await ensureAuth();
+        let res = await fetch('/api/v1/tasks/clear-history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch('/api/v1/tasks/clear-history', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        }
+        if (res.ok) {
+          if (btn) btn.innerText = 'Cleared';
+          await fetchTasks();
+          setTimeout(() => {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerText = originalText;
+            }
+          }, 1500);
+        } else {
+          alert('Failed to clear history.');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = originalText;
+          }
+        }
+      } catch (err) {
+        console.error('Clear history error:', err);
+        alert('Error clearing history: ' + err.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = originalText;
+        }
+      }
+    }
+
     async function startPriorityProcessing() {
       if (isProcessingQueue) return;
 
@@ -1305,12 +1384,12 @@ async def real_time_dashboard():
       isProcessingQueue = true;
       if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '⏳ Processing (P10 ➔ P1)...';
+        btn.innerHTML = 'Processing (P10 to P1)...';
         btn.style.background = '#F59E0B';
       }
       if (colBtn) {
         colBtn.disabled = true;
-        colBtn.innerText = '⏳ Processing...';
+        colBtn.innerText = 'Processing...';
       }
 
       try {
@@ -1319,37 +1398,39 @@ async def real_time_dashboard():
           headers: { 'Content-Type': 'application/json' }
         });
 
-        // Fast polling for 12 seconds to visibly animate transitions from QUEUED -> RUNNING -> SUCCESS
+        // Fast rapid polling at 350ms to visibly capture and animate transitions: QUEUED -> RUNNING -> SUCCESS
         let polls = 0;
+        const maxPolls = 70; // 70 * 350ms = ~24.5s max
         const fastPoll = setInterval(async () => {
           await fetchTasks();
           polls++;
-          const remaining = parseInt(document.getElementById('queued-count').innerText || '0');
-          if (remaining === 0 || polls >= 15) {
+          const remainingQueued = parseInt(document.getElementById('queued-count').innerText || '0');
+          const runningCount = parseInt(document.getElementById('running-count').innerText || '0');
+          if ((remainingQueued === 0 && runningCount === 0) || polls >= maxPolls) {
             clearInterval(fastPoll);
             isProcessingQueue = false;
             if (btn) {
               btn.disabled = false;
-              btn.innerHTML = '▶️ Start Processing (<span id="start-count">' + remaining + '</span>)';
+              btn.innerHTML = 'Start Processing (<span id="start-count">' + remainingQueued + '</span>)';
               btn.style.background = '#10B981';
             }
             if (colBtn) {
               colBtn.disabled = false;
-              colBtn.innerText = '▶️ Process Queue';
+              colBtn.innerText = 'Process Queue';
             }
           }
-        }, 750);
+        }, 350);
       } catch (err) {
         console.error('Failed to start processing:', err);
         isProcessingQueue = false;
         if (btn) {
           btn.disabled = false;
-          btn.innerHTML = '▶️ Start Processing (<span id="start-count">' + queuedCount + '</span>)';
+          btn.innerHTML = 'Start Processing (<span id="start-count">' + queuedCount + '</span>)';
           btn.style.background = '#10B981';
         }
         if (colBtn) {
           colBtn.disabled = false;
-          colBtn.innerText = '▶️ Process Queue';
+          colBtn.innerText = 'Process Queue';
         }
       }
     }
