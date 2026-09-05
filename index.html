@@ -140,9 +140,35 @@
       .metric-val { font-size: 1.4rem; }
       .form-grid { grid-template-columns: 1fr; }
     }
+
+    /* Toast Notification System */
+    #toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000000; display: flex; flex-direction: column; gap: 10px; max-width: 420px; width: calc(100% - 40px); pointer-events: none; }
+    .toast-msg { background: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); pointer-events: auto; animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: #F8FAFC; transition: opacity 0.3s, transform 0.3s; }
+    @keyframes toastSlideIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+    .toast-msg.toast-success { border-left: 4px solid #10B981; }
+    .toast-msg.toast-info { border-left: 4px solid #3B82F6; }
+    .toast-msg.toast-warning { border-left: 4px solid #F59E0B; }
+    .toast-msg.toast-error { border-left: 4px solid #EF4444; }
+    .toast-header { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+    .toast-title { font-size: 0.9rem; color: #FFFFFF; font-weight: 700; }
+    .toast-body { color: #94A3B8; font-size: 0.8rem; line-height: 1.4; word-break: break-word; }
+    .toast-actions { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+    .toast-close { background: none; border: none; color: #64748B; cursor: pointer; font-size: 1.2rem; line-height: 1; padding: 0 4px; }
+    .toast-close:hover { color: #CBD5E1; }
+
+    /* Dispatch Box Highlight Pulse */
+    @keyframes pulseHighlight {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); border-color: #10B981; }
+      50% { box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.4); border-color: #34D399; }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .pulse-box-highlight { animation: pulseHighlight 1.8s ease-out; }
   </style>
 </head>
 <body>
+  <!-- Toast Notification Action Center -->
+  <div id="toast-container"></div>
+
   <div class="container">
     <!-- Server Offline / Static Server Notice -->
     <div id="offline-alert" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#FCA5A5; font-size:0.85rem; line-height:1.5;">
@@ -273,10 +299,10 @@
           </div>
           <div class="form-group" style="grid-column: 1 / -1; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:-4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05);">
             <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:#94A3B8; cursor:pointer; margin:0;">
-              <input type="checkbox" id="task-dedup" checked style="cursor:pointer;" />
+              <input type="checkbox" id="task-dedup" style="cursor:pointer;" />
               <span>Duplicate Detection Guard (Reject duplicate active tasks)</span>
             </label>
-            <span id="dup-status-hint" style="font-size:0.75rem; color:#64748B;">Active deduplication enabled</span>
+            <span id="dup-status-hint" style="font-size:0.75rem; color:#64748B;">Duplicate guard optional</span>
           </div>
         </div>
       </form>
@@ -466,12 +492,83 @@
     }
 
     // Smart Base URL resolver: seamlessly supports same-origin, file://, and static web servers (like port 8080)
+    let detectedApiBase = '';
+
+    async function detectApiBase() {
+      if (window.location.protocol === 'http:' && window.location.port === '8000') {
+        detectedApiBase = '';
+        return;
+      }
+      if (window.location.hostname === 'cloudtask-platform.onrender.com') {
+        detectedApiBase = '';
+        return;
+      }
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 800);
+        const testRes = await fetch('http://localhost:8000/health/live', { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (testRes.ok) {
+          detectedApiBase = 'http://localhost:8000';
+          return;
+        }
+      } catch (e) {}
+      detectedApiBase = 'https://cloudtask-platform.onrender.com';
+    }
+
     function getApiUrl(path) {
       const cleanPath = path.startsWith('/') ? path : '/' + path;
+      if (detectedApiBase) return detectedApiBase + cleanPath;
       if (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '8000')) {
         return 'https://cloudtask-platform.onrender.com' + cleanPath;
       }
       return cleanPath;
+    }
+
+    // Enterprise Toast Notification & Action Center
+    function showToast(title, message, type = 'info', actionBtn = null) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = `toast-msg toast-${type}`;
+
+      let actionHtml = '';
+      if (actionBtn && actionBtn.label) {
+        actionHtml = `<div class="toast-actions"><button type="button" class="btn btn-xs ${type === 'success' ? 'btn-success' : 'btn-primary'}" id="toast-act-btn">${actionBtn.label}</button></div>`;
+      }
+
+      toast.innerHTML = `
+        <div class="toast-header">
+          <span class="toast-title">${title}</span>
+          <button type="button" class="toast-close" title="Dismiss">&times;</button>
+        </div>
+        <div class="toast-body">${message}</div>
+        ${actionHtml}
+      `;
+
+      const closeBtn = toast.querySelector('.toast-close');
+      const dismiss = () => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-10px)';
+        setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+      };
+      closeBtn.onclick = dismiss;
+
+      if (actionBtn && actionBtn.onClick) {
+        const actBtn = toast.querySelector('#toast-act-btn');
+        if (actBtn) {
+          actBtn.onclick = () => {
+            try { actionBtn.onClick(); } catch(e) { console.warn(e); }
+            dismiss();
+          };
+        }
+      }
+
+      const timer = setTimeout(dismiss, 5500);
+      toast.onmouseenter = () => clearTimeout(timer);
+
+      container.appendChild(toast);
     }
 
     let authToken = getStorageToken();
@@ -589,9 +686,33 @@
       if (panel.style.display === 'none') {
         panel.style.display = 'block';
       }
-      panel.scrollIntoView({ behavior: 'smooth' });
-      const input = document.getElementById('task-title');
-      if (input) input.focus();
+      const sampleNum = Math.floor(1000 + Math.random() * 9000);
+      const titleInput = document.getElementById('task-title');
+      const handlers = ['report_generation', 'data_processing', 'email_dispatch', 'system_cleanup'];
+      const typeSelect = document.getElementById('task-type');
+      const currentIdx = handlers.indexOf(typeSelect.value);
+      const nextType = handlers[(currentIdx + 1) % handlers.length];
+
+      titleInput.value = 'Pipeline Task #' + sampleNum;
+      typeSelect.value = nextType;
+
+      const fb = document.getElementById('dispatch-feedback');
+      if (fb) fb.style.display = 'none';
+
+      panel.classList.remove('pulse-box-highlight');
+      void panel.offsetWidth;
+      panel.classList.add('pulse-box-highlight');
+
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      titleInput.focus();
+      titleInput.select();
+
+      showToast(
+        'New Task Dispatcher Ready',
+        `Pre-populated 'Pipeline Task #${sampleNum}' (${nextType}). Configure priority and click Enqueue Task.`,
+        'info',
+        { label: 'Enqueue Now', onClick: () => handleDispatch() }
+      );
     }
 
     function handleSearch(val) {
@@ -907,14 +1028,14 @@
       let token = await ensureAuth();
       let title = (document.getElementById('task-title').value || '').trim();
       if (!title) {
-        title = 'Quick Task #' + Date.now().toString().slice(-4);
+        title = 'Quick Task #' + Math.floor(1000 + Math.random() * 9000);
       }
       const task_type = document.getElementById('task-type').value;
       const priority = parseInt(document.getElementById('task-priority').value, 10);
       const delay = parseInt(document.getElementById('task-delay').value, 10) || 0;
       const webhook = (document.getElementById('task-webhook').value || '').trim() || null;
       const dedupCheckbox = document.getElementById('task-dedup');
-      const preventDuplicates = dedupCheckbox ? dedupCheckbox.checked : true;
+      const preventDuplicates = dedupCheckbox ? dedupCheckbox.checked : false;
 
       try {
         const payloadBody = {
@@ -965,7 +1086,18 @@
             allTasks.unshift(createdTask);
             applyFiltersAndRender();
 
+            showToast(
+              'Task Enqueued Successfully',
+              `[${createdTask.id.slice(0, 8)}] "${createdTask.title}" (${createdTask.task_type}, P${createdTask.priority}). Status: ${createdTask.status}.`,
+              'success',
+              { label: 'Inspect Task', onClick: () => openTaskModal(createdTask.id) }
+            );
+
             if (fb) {
+              const startProcessingBtnHtml = currentExecutionMode === 'manual'
+                ? `<button type="button" class="btn btn-xs btn-success" onclick="startPriorityProcessing()" style="background:#10B981;">Start Processing</button>`
+                : '';
+
               fb.style.display = 'block';
               fb.style.background = 'rgba(16, 185, 129, 0.12)';
               fb.style.border = '1px solid rgba(16, 185, 129, 0.35)';
@@ -983,12 +1115,12 @@
                       Task ID: ${createdTask.id} &bull; Trace: ${createdTask.trace_id || 'N/A'}
                     </div>
                     <div id="fb-result-${createdTask.id}" style="margin-top:6px; font-size:0.8rem; color:#38BDF8; font-family:monospace;">
-                      Waiting for worker pickup...
+                      ${currentExecutionMode === 'manual' ? 'Staged in queue. Click Start Processing to execute.' : 'Worker executing task...'}
                     </div>
                   </div>
-                  <div style="display:flex; gap:8px; align-self:flex-start;">
+                  <div style="display:flex; gap:8px; align-self:flex-start; flex-wrap:wrap;">
                     <button type="button" class="btn btn-xs btn-primary" onclick="openTaskModal('${createdTask.id}')">Inspect</button>
-                    <button type="button" class="btn btn-xs btn-success" onclick="startPriorityProcessing()" style="background:#10B981;">Process Queue</button>
+                    ${startProcessingBtnHtml}
                   </div>
                 </div>
               `;
@@ -1005,10 +1137,11 @@
           if (res.status === 409) {
             errMsg = 'Duplicate Task Blocked (409 Conflict): ' + (errData.detail || 'A matching active task already exists in the queue.') + '<br><small style="color:#CBD5E1;">Tip: Uncheck "Duplicate Detection Guard" below if you want to allow duplicate tasks.</small>';
           } else if (res.status === 404) {
-            errMsg = 'Endpoint Not Found (404): Backend task service is not running on this port. If viewing via <code>python -m http.server</code>, run <code>./run_local.sh</code> to start the FastAPI engine.';
+            errMsg = 'Endpoint Not Found (404): Backend task service is not running on this port.';
           } else {
             errMsg = 'Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.');
           }
+          showToast('Task Dispatch Conflict', errMsg.replace(/<[^>]*>/g, ''), 'error');
           if (fb) {
             fb.style.display = 'block';
             fb.style.background = 'rgba(239, 68, 68, 0.15)';
@@ -1016,23 +1149,20 @@
             fb.style.color = '#FCA5A5';
             fb.innerHTML = `<strong>Error:</strong> ${errMsg}`;
             fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          } else {
-            alert(errMsg.replace(/<[^>]*>/g, ''));
           }
           btn.disabled = false;
           btn.innerText = 'Enqueue Task';
         }
       } catch (err) {
+        showToast('Dispatch Error', err.message, 'error');
         const fbErr = document.getElementById('dispatch-feedback');
         if (fbErr) {
           fbErr.style.display = 'block';
           fbErr.style.background = 'rgba(239, 68, 68, 0.15)';
           fbErr.style.border = '1px solid rgba(239, 68, 68, 0.4)';
           fbErr.style.color = '#FCA5A5';
-          fbErr.innerHTML = `<strong>Dispatch Error:</strong> ${err.message}. If running locally, please start the engine using <code>./run_local.sh</code> or <code>make run</code> instead of a static file server.`;
+          fbErr.innerHTML = `<strong>Dispatch Error:</strong> ${err.message}`;
           fbErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } else {
-          alert('Dispatch error: ' + err.message);
         }
         btn.disabled = false;
         btn.innerText = 'Enqueue Task';
@@ -1054,12 +1184,24 @@
               resEl.style.color = '#34D399';
               resEl.innerHTML = `<strong>Result Returned:</strong> <code>${JSON.stringify(t.result || { status: 'SUCCESS' })}</code>`;
             }
+            showToast(
+              'Task Finished: ' + t.title,
+              `Execution returned: ${JSON.stringify(t.result || {})}`,
+              'success',
+              { label: 'Inspect Result', onClick: () => openTaskModal(taskId) }
+            );
             clearInterval(interval);
           } else if (t.status === 'FAILED' || t.status === 'DEAD_LETTERED') {
             if (resEl) {
               resEl.style.color = '#F87171';
               resEl.innerHTML = `<strong>Execution Failed:</strong> ${t.error_message || 'Task failed'}`;
             }
+            showToast(
+              'Task Failed: ' + t.title,
+              t.error_message || 'Task execution error',
+              'error',
+              { label: 'Inspect Error', onClick: () => openTaskModal(taskId) }
+            );
             clearInterval(interval);
           } else if (t.status === 'RUNNING') {
             if (resEl) {
@@ -1068,7 +1210,7 @@
             }
           }
         }
-        if (attempts >= 25) clearInterval(interval);
+        if (attempts >= 30) clearInterval(interval);
       }, 350);
     }
 
@@ -1165,6 +1307,14 @@
 
       // 2. Trigger browser file download
       triggerCsvDownload();
+
+      // 3. Unmistakable toast notification
+      showToast(
+        'CSV Audit Export Ready',
+        `Generated export with ${taskCount} task records. File download initiated.`,
+        'success',
+        { label: 'View CSV Stream', onClick: () => showCsvExportModal(lastExportedCsv, taskCount) }
+      );
     }
 
     function buildClientSideCsv() {
@@ -1344,9 +1494,29 @@
           const data = await res.json();
           currentExecutionMode = data.mode || targetMode;
           updateModeUI();
+          if (currentExecutionMode === 'auto') {
+            const queued = data.queued_count || parseInt(document.getElementById('queued-count').innerText || '0');
+            showToast(
+              'Mode Switched: Auto-Start Active',
+              `Tasks execute automatically in background as soon as submitted.${queued > 0 ? ' Auto-processing ' + queued + ' queued tasks.' : ''}`,
+              'success',
+              queued > 0 ? { label: `Watch Processing (${queued})`, onClick: () => startPriorityProcessing() } : null
+            );
+            if (queued > 0) fetchTasks();
+          } else {
+            showToast(
+              'Mode Switched: Manual Batch Mode',
+              'Tasks will stage in the QUEUED column so you can test priority sorting. Click "Start Processing" when you are ready to execute.',
+              'info',
+              { label: 'Prefill Sample Task', onClick: () => toggleDispatcher() }
+            );
+          }
+        } else {
+          showToast('Mode Switch Failed', 'Backend returned an error updating mode.', 'error');
         }
       } catch (err) {
         console.error('Toggle execution mode error:', err);
+        showToast('Mode Switch Error', err.message, 'error');
       } finally {
         if (btn) btn.disabled = false;
       }
@@ -1357,7 +1527,7 @@
       const originalText = btn ? btn.innerText : 'Clear History';
       const successCount = parseInt(document.getElementById('success-count').innerText || '0');
       if (successCount === 0) {
-        alert('No completed tasks in history to clear.');
+        showToast('Clear History', 'No completed tasks in history to clear.', 'info');
         return;
       }
       if (!confirm(`Are you sure you want to clear ${successCount} completed tasks from history?`)) {
@@ -1388,6 +1558,7 @@
         }
         if (res.ok) {
           if (btn) btn.innerText = 'Cleared';
+          showToast('History Cleared', `Successfully purged ${successCount} completed tasks.`, 'success');
           await fetchTasks();
           setTimeout(() => {
             if (btn) {
@@ -1396,7 +1567,7 @@
             }
           }, 1500);
         } else {
-          alert('Failed to clear history.');
+          showToast('Clear Failed', 'Failed to clear task history from database.', 'error');
           if (btn) {
             btn.disabled = false;
             btn.innerText = originalText;
@@ -1404,12 +1575,45 @@
         }
       } catch (err) {
         console.error('Clear history error:', err);
-        alert('Error clearing history: ' + err.message);
+        showToast('Clear History Error', err.message, 'error');
         if (btn) {
           btn.disabled = false;
           btn.innerText = originalText;
         }
       }
+    }
+
+    async function seedAndProcessDemoTasks() {
+      showToast('Seeding Demo Tasks', 'Submitting 3 sample tasks with priorities P10 (Critical), P8 (High), and P5 (Normal)...', 'info');
+      const demoTasks = [
+        { title: 'Critical Financial Audit Report', task_type: 'report_generation', priority: 10 },
+        { title: 'High-Volume ETL Ingestion Batch', task_type: 'data_processing', priority: 8 },
+        { title: 'Customer Notification Dispatch', task_type: 'email_dispatch', priority: 5 }
+      ];
+      let token = await ensureAuth();
+      for (const dt of demoTasks) {
+        try {
+          await fetch(getApiUrl('/api/v1/tasks'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              title: dt.title,
+              task_type: dt.task_type,
+              priority: dt.priority,
+              delay_seconds: 0,
+              prevent_duplicates: false,
+              payload: { demo: true, timestamp: Date.now() }
+            })
+          });
+        } catch (e) {
+          console.warn('Demo task seed error:', e);
+        }
+      }
+      await fetchTasks();
+      setTimeout(() => startPriorityProcessing(), 400);
     }
 
     async function startPriorityProcessing() {
@@ -1420,7 +1624,12 @@
       const queuedCount = parseInt(document.getElementById('queued-count').innerText || '0');
 
       if (queuedCount === 0) {
-        alert('No tasks are currently queued! Enqueue 2 or 3 tasks with different priorities first (e.g. Priority 2, Priority 10), then tap Start Processing to watch priority scheduling in action.');
+        showToast(
+          'Queue Empty (0 Staged Tasks)',
+          'There are no tasks waiting in the queue. Click below to automatically dispatch and process 3 demo tasks with priorities P10, P8, and P5.',
+          'warning',
+          { label: 'Dispatch & Process 3 Demo Tasks', onClick: () => seedAndProcessDemoTasks() }
+        );
         return;
       }
 
@@ -1434,6 +1643,12 @@
         colBtn.disabled = true;
         colBtn.innerText = 'Processing...';
       }
+
+      showToast(
+        'Priority Processing Initiated',
+        `Processing ${queuedCount} queued tasks strictly in descending priority order (P10 to P1)...`,
+        'info'
+      );
 
       try {
         await fetch(getApiUrl('/api/v1/tasks/start-processing'), {
@@ -1461,6 +1676,12 @@
               colBtn.disabled = false;
               colBtn.innerText = 'Process Queue';
             }
+            showToast(
+              'Priority Batch Complete',
+              'All staged tasks have executed in priority order with live output data returned.',
+              'success',
+              { label: 'Export Audit CSV', onClick: () => exportTasksCsv() }
+            );
           }
         }, 350);
       } catch (err) {
@@ -1475,13 +1696,16 @@
           colBtn.disabled = false;
           colBtn.innerText = 'Process Queue';
         }
+        showToast('Processing Error', err.message, 'error');
       }
     }
 
-    // Initial fetch and 2.5-second live polling loop
-    fetchExecutionMode();
-    fetchTasks();
-    setInterval(fetchTasks, 2500);
+    // Dynamic endpoint detection and live polling initialization
+    detectApiBase().then(() => {
+      fetchExecutionMode();
+      fetchTasks();
+      setInterval(fetchTasks, 2500);
+    });
   </script>
 </body>
 </html>

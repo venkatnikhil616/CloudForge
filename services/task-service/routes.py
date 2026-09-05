@@ -210,7 +210,12 @@ async def create_task(
                 routing_key="task.created",
             )
         except Exception as e:
-            logger.warning(f"RabbitMQ publish deferred/unavailable: {e}. Task safely stored in database.")
+            logger.warning(f"RabbitMQ publish deferred/unavailable: {e}. Executing directly via local worker.")
+            try:
+                from services.worker.executor import execute_task
+                asyncio.create_task(execute_task(task_message))
+            except Exception as ex_exec:
+                logger.warning(f"Direct worker fallback failed: {ex_exec}")
     elif initial_status == TaskStatus.QUEUED:
         logger.info(f"Task {task.id} stored in database in manual/staged mode (Priority {task.priority}). Awaiting Start Processing trigger.")
 
@@ -313,7 +318,15 @@ async def create_batch_tasks(
                     routing_key="task.created",
                 )
         except Exception as e:
-            logger.warning(f"Batch RabbitMQ publish deferred/unavailable: {e}")
+            logger.warning(f"Batch RabbitMQ publish deferred/unavailable: {e}. Executing directly via local worker.")
+            from pkg.redis_client import get_execution_mode
+            if await get_execution_mode() == "auto":
+                try:
+                    from services.worker.executor import execute_task
+                    for msg in queued_messages:
+                        asyncio.create_task(execute_task(msg["payload"]))
+                except Exception as ex_exec:
+                    logger.warning(f"Batch direct worker fallback failed: {ex_exec}")
 
     task_ids = [t.id for t in created_tasks]
     stmt = select(Task).options(selectinload(Task.attempts)).where(Task.id.in_(task_ids))
@@ -501,16 +514,23 @@ async def get_execution_mode_endpoint(db: AsyncSession = Depends(get_db_session)
 
 
 @router.post("/execution-mode")
-async def set_execution_mode_endpoint(request: Request):
+async def set_execution_mode_endpoint(request: Request, db: AsyncSession = Depends(get_db_session)):
     """Switches task processing mode between 'manual' (batch staging) and 'auto' (instant)."""
     from pkg.redis_client import set_execution_mode
     try:
         body = await request.json()
-        new_mode = body.get("mode", "manual")
+        new_mode = body.get("mode", "auto")
     except Exception:
-        new_mode = "manual"
+        new_mode = "auto"
     saved_mode = await set_execution_mode(new_mode)
-    return {"mode": saved_mode, "status": "updated"}
+    queued_count = 0
+    if saved_mode == "auto":
+        from services.worker.main import process_priority_queue
+        stmt = select(func.count(Task.id)).where(Task.status.in_([TaskStatus.QUEUED, TaskStatus.PENDING]))
+        queued_count = (await db.execute(stmt)).scalar() or 0
+        if queued_count > 0:
+            asyncio.create_task(process_priority_queue())
+    return {"mode": saved_mode, "status": "updated", "queued_count": queued_count}
 
 
 @router.post("/start-processing")
