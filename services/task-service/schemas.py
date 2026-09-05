@@ -17,6 +17,7 @@ class CreateTaskRequest(BaseModel):
     idempotency_key: Optional[str] = Field(default=None, max_length=255)
     webhook_url: Optional[str] = Field(default=None, max_length=1000, description="HMAC-signed webhook callback URL upon completion or failure")
     delay_seconds: Optional[int] = Field(default=0, ge=0, le=86400, description="Delay execution countdown in seconds (AWS SQS pattern)")
+    prevent_duplicates: Optional[bool] = Field(default=True, description="When true, detects and blocks duplicate active tasks with identical title and type")
 
 
 class TaskAttemptResponse(BaseModel):

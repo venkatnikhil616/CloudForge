@@ -122,7 +122,29 @@ async def create_task(
                 logger.info(f"Returning cached task {cached_id} for idempotency key {req.idempotency_key}")
                 return existing
 
-    # 2. Check DAG dependencies and delayed execution
+    # 2. Duplicate Detection: Check if active task with identical title and type already exists
+    if getattr(req, "prevent_duplicates", True):
+        dup_stmt = (
+            select(Task)
+            .where(
+                Task.user_id == user_id,
+                Task.title == req.title,
+                Task.task_type == req.task_type,
+                Task.status.in_([TaskStatus.QUEUED, TaskStatus.PENDING, TaskStatus.RUNNING]),
+            )
+            .limit(1)
+        )
+        existing_dup = (await db.execute(dup_stmt)).scalar_one_or_none()
+        if existing_dup:
+            logger.warning(
+                f"Duplicate task rejected: '{req.title}' ({req.task_type}) already active as {existing_dup.status} ({existing_dup.id})"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Duplicate task detected: A task with title '{req.title}' and type '{req.task_type}' is already active in state '{existing_dup.status}' (Task ID: {existing_dup.id})."
+            )
+
+    # 3. Check DAG dependencies and delayed execution
     initial_status = TaskStatus.QUEUED
     scheduled_at = None
     if req.delay_seconds and req.delay_seconds > 0:
@@ -697,6 +719,84 @@ async def clear_history_endpoint(db: AsyncSession = Depends(get_db_session)):
         "status": "ok",
         "deleted_count": len(task_ids),
         "message": f"Successfully cleared {len(task_ids)} historical tasks."
+    }
+
+
+@router.post("/check-duplicate")
+async def check_duplicate_endpoint(
+    req: CreateTaskRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Pre-flight verification to detect if an active duplicate task exists with the given title and type.
+    """
+    dup_stmt = (
+        select(Task)
+        .where(
+            Task.user_id == user_id,
+            Task.title == req.title,
+            Task.task_type == req.task_type,
+            Task.status.in_([TaskStatus.QUEUED, TaskStatus.PENDING, TaskStatus.RUNNING]),
+        )
+        .limit(1)
+    )
+    existing_dup = (await db.execute(dup_stmt)).scalar_one_or_none()
+    if existing_dup:
+        return {
+            "is_duplicate": True,
+            "existing_task_id": existing_dup.id,
+            "status": existing_dup.status,
+            "title": existing_dup.title,
+            "task_type": existing_dup.task_type,
+            "message": f"An active duplicate task already exists in status '{existing_dup.status}' (Task ID: {existing_dup.id}).",
+        }
+    return {"is_duplicate": False, "message": "No active duplicate task found."}
+
+
+@router.get("/duplicates")
+async def get_duplicates_endpoint(
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Scans the cluster and returns all groups of duplicate tasks (sharing the same title and task_type).
+    """
+    stmt = (
+        select(Task)
+        .where(Task.status.in_([TaskStatus.QUEUED, TaskStatus.PENDING, TaskStatus.RUNNING]))
+        .order_by(Task.created_at.asc())
+    )
+    if user_id != "admin-default" and user_id != "system":
+        stmt = stmt.where(Task.user_id == user_id)
+
+    tasks = (await db.execute(stmt)).scalars().all()
+
+    groups: dict = {}
+    for t in tasks:
+        sig = f"{t.task_type}::{t.title}"
+        if sig not in groups:
+            groups[sig] = []
+        groups[sig].append({
+            "id": t.id,
+            "title": t.title,
+            "task_type": t.task_type,
+            "status": t.status,
+            "priority": t.priority,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        })
+
+    duplicates = [
+        {"signature": sig, "title": items[0]["title"], "task_type": items[0]["task_type"], "count": len(items), "tasks": items}
+        for sig, items in groups.items()
+        if len(items) > 1
+    ]
+
+    return {
+        "status": "ok",
+        "duplicate_groups_count": len(duplicates),
+        "total_duplicate_tasks": sum(d["count"] for d in duplicates),
+        "duplicates": duplicates,
     }
 
 

@@ -531,6 +531,10 @@ async def real_time_dashboard():
           <option value="5">Priority 5 (Normal)</option>
           <option value="1">Priority 1 (Low)</option>
         </select>
+        <select id="filter-duplicate" class="filter-select" onchange="applyFilters()">
+          <option value="">All Tasks</option>
+          <option value="duplicates">Duplicates Only</option>
+        </select>
       </div>
     </div>
 
@@ -542,12 +546,15 @@ async def real_time_dashboard():
       <form id="task-form" onsubmit="handleDispatch(event)">
         <div class="form-grid">
           <div class="form-group">
-            <label>Task Title</label>
-            <input type="text" id="task-title" class="form-control" placeholder="e.g. Ingest Customer Ledger" />
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label>Task Title</label>
+              <span id="duplicate-warning" style="display:none; font-size:0.72rem; color:#F59E0B; font-weight:600;">Duplicate Detected</span>
+            </div>
+            <input type="text" id="task-title" class="form-control" placeholder="e.g. Ingest Customer Ledger" oninput="checkDuplicateInline()" />
           </div>
           <div class="form-group">
             <label>Handler Type</label>
-            <select id="task-type" class="form-control">
+            <select id="task-type" class="form-control" onchange="checkDuplicateInline()">
               <option value="report_generation">report_generation (PDF Export)</option>
               <option value="data_processing">data_processing (ETL Batch)</option>
               <option value="email_dispatch">email_dispatch (Transactional Email)</option>
@@ -575,6 +582,13 @@ async def real_time_dashboard():
             <button type="submit" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
               Enqueue Task
             </button>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:-4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05);">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:#94A3B8; cursor:pointer; margin:0;">
+              <input type="checkbox" id="task-dedup" checked style="cursor:pointer;" />
+              <span>Duplicate Detection Guard (Reject duplicate active tasks)</span>
+            </label>
+            <span id="dup-status-hint" style="font-size:0.75rem; color:#64748B;">Active deduplication enabled</span>
           </div>
         </div>
       </form>
@@ -678,6 +692,10 @@ async def real_time_dashboard():
             <div class="detail-label">Updated Timestamp</div>
             <div class="detail-val" id="modal-updated">-</div>
           </div>
+          <div class="detail-item">
+            <div class="detail-label">Duplicate Status</div>
+            <div class="detail-val" id="modal-dup-status"><span style="color:#34D399;">Unique</span></div>
+          </div>
         </div>
 
         <!-- Payload viewer -->
@@ -725,6 +743,7 @@ async def real_time_dashboard():
     let currentSearch = '';
     let currentTypeFilter = '';
     let currentPriorityFilter = '';
+    let currentDuplicateFilter = '';
     let activeMobileTab = 'ALL';
     let currentModalTaskId = null;
 
@@ -772,8 +791,44 @@ async def real_time_dashboard():
         const data = await res.json();
         allTasks = data.tasks || [];
         applyFiltersAndRender();
+        checkDuplicateInline();
       } catch (err) {
         console.error('Fetch error:', err);
+      }
+    }
+
+    function checkDuplicateInline() {
+      const title = (document.getElementById('task-title').value || '').trim();
+      const type = document.getElementById('task-type').value;
+      const warnEl = document.getElementById('duplicate-warning');
+      const inputEl = document.getElementById('task-title');
+      const hintEl = document.getElementById('dup-status-hint');
+
+      if (!title) {
+        if (warnEl) warnEl.style.display = 'none';
+        if (inputEl) inputEl.style.borderColor = '';
+        if (hintEl) hintEl.innerText = 'Active deduplication enabled';
+        return;
+      }
+
+      // Check against allTasks for active tasks (QUEUED, PENDING, RUNNING) with identical title and task_type
+      const activeDup = allTasks.find(t =>
+        ['QUEUED', 'PENDING', 'RUNNING'].includes(t.status) &&
+        (t.title || '').trim().toLowerCase() === title.toLowerCase() &&
+        t.task_type === type
+      );
+
+      if (activeDup) {
+        if (warnEl) {
+          warnEl.innerText = `Duplicate Detected (${activeDup.status})`;
+          warnEl.style.display = 'inline';
+        }
+        if (inputEl) inputEl.style.borderColor = '#F59E0B';
+        if (hintEl) hintEl.innerText = `Warning: Active task "${title}" already exists in ${activeDup.status} state`;
+      } else {
+        if (warnEl) warnEl.style.display = 'none';
+        if (inputEl) inputEl.style.borderColor = '';
+        if (hintEl) hintEl.innerText = 'No active duplicate detected';
       }
     }
 
@@ -795,6 +850,8 @@ async def real_time_dashboard():
     function applyFilters() {
       currentTypeFilter = document.getElementById('filter-type').value;
       currentPriorityFilter = document.getElementById('filter-priority').value;
+      const dupSelect = document.getElementById('filter-duplicate');
+      currentDuplicateFilter = dupSelect ? dupSelect.value : '';
       applyFiltersAndRender();
     }
 
@@ -822,9 +879,19 @@ async def real_time_dashboard():
     }
 
     function applyFiltersAndRender() {
+      const sigCounts = {};
+      allTasks.forEach(task => {
+        const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+        sigCounts[sig] = (sigCounts[sig] || 0) + 1;
+      });
+
       const filtered = allTasks.filter(task => {
         if (currentTypeFilter && task.task_type !== currentTypeFilter) return false;
         if (currentPriorityFilter && String(task.priority) !== currentPriorityFilter) return false;
+        if (currentDuplicateFilter === 'duplicates') {
+          const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+          if ((sigCounts[sig] || 0) <= 1) return false;
+        }
         if (currentSearch) {
           const matchTitle = (task.title || '').toLowerCase().includes(currentSearch);
           const matchId = (task.id || '').toLowerCase().includes(currentSearch);
@@ -834,10 +901,10 @@ async def real_time_dashboard():
         return true;
       });
 
-      renderColumns(filtered);
+      renderColumns(filtered, sigCounts);
     }
 
-    function renderColumns(tasks) {
+    function renderColumns(tasks, sigCounts = {}) {
       const cols = {
         QUEUED: document.getElementById('col-queued'),
         RUNNING: document.getElementById('col-running'),
@@ -882,6 +949,13 @@ async def real_time_dashboard():
           webhookBadge = `<span class="tag tag-wh" title="${task.webhook_url}">Webhook</span>`;
         }
 
+        const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+        const isDup = (sigCounts[sig] || 0) > 1;
+        let dupBadge = '';
+        if (isDup) {
+          dupBadge = `<span class="tag" style="background:rgba(245,158,11,0.15); color:#F59E0B; border:1px solid rgba(245,158,11,0.3);" title="Duplicate task: ${sigCounts[sig]} instances detected">Duplicate (${sigCounts[sig]})</span>`;
+        }
+
         let actionHtml = `
           <div class="card-actions">
             <button onclick="openTaskModal('${task.id}')" class="btn btn-secondary btn-xs">Inspect</button>
@@ -908,6 +982,7 @@ async def real_time_dashboard():
             <span class="tag">Att: ${task.current_attempt}/${task.max_retries}</span>
             ${delayBadge}
             ${webhookBadge}
+            ${dupBadge}
           </div>
           ${progressHtml}
           ${snippet}
@@ -962,6 +1037,17 @@ async def real_time_dashboard():
       document.getElementById('modal-delay-webhook').innerText = `Delay: ${task.delay_seconds || 0}s | Webhook: ${task.webhook_url ? 'Configured' : 'None'}`;
       document.getElementById('modal-created').innerText = new Date(task.created_at).toLocaleString();
       document.getElementById('modal-updated').innerText = new Date(task.updated_at).toLocaleString();
+
+      const dupStatusEl = document.getElementById('modal-dup-status');
+      if (dupStatusEl) {
+        const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+        const dupList = allTasks.filter(t => `${t.task_type}::${(t.title || '').trim().toLowerCase()}` === sig);
+        if (dupList.length > 1) {
+          dupStatusEl.innerHTML = `<span style="color:#F59E0B; font-weight:600;">Duplicate Detected (${dupList.length} instances in system)</span>`;
+        } else {
+          dupStatusEl.innerHTML = `<span style="color:#34D399;">Unique (No duplicates detected)</span>`;
+        }
+      }
 
       const badge = document.getElementById('modal-status-badge');
       badge.innerText = task.status;
@@ -1066,6 +1152,8 @@ async def real_time_dashboard():
       const priority = parseInt(document.getElementById('task-priority').value, 10);
       const delay = parseInt(document.getElementById('task-delay').value, 10) || 0;
       const webhook = document.getElementById('task-webhook').value.trim() || null;
+      const dedupCheckbox = document.getElementById('task-dedup');
+      const preventDuplicates = dedupCheckbox ? dedupCheckbox.checked : true;
 
       try {
         const payloadBody = {
@@ -1073,6 +1161,7 @@ async def real_time_dashboard():
           task_type: task_type,
           priority: priority,
           delay_seconds: delay,
+          prevent_duplicates: preventDuplicates,
           payload: { timestamp: Date.now() }
         };
         if (webhook) payloadBody.webhook_url = webhook;
@@ -1103,6 +1192,7 @@ async def real_time_dashboard():
           document.getElementById('task-title').value = '';
           document.getElementById('task-webhook').value = '';
           document.getElementById('task-delay').value = '0';
+          checkDuplicateInline();
           btn.innerText = 'Enqueued';
           setTimeout(() => {
             btn.disabled = false;
@@ -1111,7 +1201,11 @@ async def real_time_dashboard():
           fetchTasks();
         } else {
           const errData = await res.json().catch(() => ({}));
-          alert('Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.'));
+          if (res.status === 409) {
+            alert('Duplicate Task Blocked (409 Conflict):\n' + (errData.detail || 'A matching active task already exists in the queue.') + '\n\nTip: Uncheck "Duplicate Detection Guard" below if you want to allow duplicate tasks.');
+          } else {
+            alert('Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.'));
+          }
           btn.disabled = false;
           btn.innerText = 'Enqueue Task';
         }
