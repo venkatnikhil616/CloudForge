@@ -119,11 +119,11 @@ async def check_redis_health() -> bool:
         return False
 
 
-_local_execution_mode: str = "manual"
+_local_execution_mode: str = "auto"
 
 
 async def get_execution_mode() -> str:
-    """Returns current task execution mode: 'manual' (default) or 'auto'."""
+    """Returns current task execution mode: 'auto' (default) or 'manual'."""
     global _local_execution_mode
     try:
         client = get_redis_client()

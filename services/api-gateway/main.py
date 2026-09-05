@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
@@ -110,6 +111,14 @@ app = FastAPI(
     docs_url="/docs",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.middleware("http")
 async def gateway_middleware(request: Request, call_next):
@@ -130,6 +139,10 @@ async def gateway_middleware(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Correlation-ID"] = correlation_id
     response.headers["X-Response-Time-Ms"] = str(int((time.time() - start_time) * 1000))
+    if request.url.path in ("/", "/dashboard", "/docs") or "text/html" in response.headers.get("content-type", ""):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 
 
@@ -478,7 +491,7 @@ async def real_time_dashboard():
       <div class="nav-links">
         <a href="/" class="btn btn-secondary">← Portal</a>
         <a href="/docs" class="btn btn-secondary">API Docs</a>
-        <button onclick="toggleExecutionMode()" class="btn btn-secondary" id="mode-toggle-btn" title="Toggle between manual batch staging and instant auto-dispatch" style="border: 1px solid #3B82F6; color: #93C5FD;">Mode: <span id="mode-badge" style="font-weight:700; color:#38BDF8;">Manual (Staged)</span></button>
+        <button onclick="toggleExecutionMode()" class="btn btn-secondary" id="mode-toggle-btn" title="Toggle between manual batch staging and instant auto-dispatch" style="border: 1px solid #10B981; color: #6EE7B7;">Mode: <span id="mode-badge" style="font-weight:700; color:#34D399;">Auto-Start</span></button>
         <button onclick="startPriorityProcessing()" class="btn btn-success" id="start-btn" style="background:#10B981; box-shadow:0 0 14px rgba(16,185,129,0.4); font-weight:700; padding:8px 16px;">Start Processing (<span id="start-count">0</span>)</button>
         <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">Export CSV</button>
         <button onclick="toggleDispatcher()" class="btn btn-primary" id="toggle-dispatch-btn">New Task</button>
@@ -488,7 +501,7 @@ async def real_time_dashboard():
 
     <!-- Cluster Fleet Summary Banner -->
     <div class="cluster-banner" id="status-banner">
-      <div id="mode-guidance-text"><strong>Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>Start Processing</strong> to execute in priority order (P10 to P1).</div>
+      <div id="mode-guidance-text"><strong>Auto-Start Mode:</strong> Tasks execute automatically in background as soon as they are submitted.</div>
       <div id="filter-count-badge" style="font-weight:600;">Showing 0 tasks</div>
     </div>
 
@@ -548,7 +561,7 @@ async def real_time_dashboard():
       <h3>
         <span>Dispatch Asynchronous Task to Cluster</span>
       </h3>
-      <form id="task-form" onsubmit="handleDispatch(event)">
+      <form id="task-form" onsubmit="handleDispatch(event); return false;">
         <div class="form-grid">
           <div class="form-group">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -581,10 +594,10 @@ async def real_time_dashboard():
           </div>
           <div class="form-group">
             <label>Webhook Callback URL (HMAC Signed)</label>
-            <input type="url" id="task-webhook" class="form-control" placeholder="https://api.example.com/webhook (Optional)" />
+            <input type="text" id="task-webhook" class="form-control" placeholder="https://api.example.com/webhook (Optional)" />
           </div>
           <div class="form-group" style="align-self: flex-end;">
-            <button type="submit" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
+            <button type="button" onclick="handleDispatch(event)" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
               Enqueue Task
             </button>
           </div>
@@ -603,11 +616,11 @@ async def real_time_dashboard():
 
     <!-- Mobile Segmented Tabs -->
     <div class="mobile-tabs" id="mobile-tabs">
-      <button class="tab-pill active" onclick="setMobileView('ALL')">All (<span id="m-all">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('QUEUED')">Queued (<span id="m-queued">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('RUNNING')">Running (<span id="m-running">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('SUCCESS')">Success (<span id="m-success">0</span>)</button>
-      <button class="tab-pill" onclick="setMobileView('DEAD_LETTERED')">DLQ (<span id="m-dlq">0</span>)</button>
+      <button class="tab-pill active" onclick="setMobileView('ALL', event)">All (<span id="m-all">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('QUEUED', event)">Queued (<span id="m-queued">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('RUNNING', event)">Running (<span id="m-running">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('SUCCESS', event)">Success (<span id="m-success">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('DEAD_LETTERED', event)">DLQ (<span id="m-dlq">0</span>)</button>
     </div>
 
     <!-- Kanban Grid -->
@@ -772,7 +785,26 @@ async def real_time_dashboard():
   </div>
 
   <script>
-    let authToken = localStorage.getItem('cloudtask_token') || '';
+    function getStorageToken() {
+      try { return localStorage.getItem('cloudtask_token') || ''; } catch (e) { return ''; }
+    }
+    function setStorageToken(val) {
+      try {
+        if (val) localStorage.setItem('cloudtask_token', val);
+        else localStorage.removeItem('cloudtask_token');
+      } catch (e) {}
+    }
+
+    // Smart Base URL resolver: seamlessly supports same-origin, file://, and static web servers (like port 8080)
+    function getApiUrl(path) {
+      const cleanPath = path.startsWith('/') ? path : '/' + path;
+      if (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '8000')) {
+        return 'https://cloudtask-platform.onrender.com' + cleanPath;
+      }
+      return cleanPath;
+    }
+
+    let authToken = getStorageToken();
     let allTasks = [];
     let currentSearch = '';
     let currentTypeFilter = '';
@@ -792,7 +824,7 @@ async def real_time_dashboard():
     async function ensureAuth(forceRefresh = false) {
       if (authToken && !forceRefresh) return authToken;
       try {
-        const res = await fetch('/api/v1/auth/login', {
+        const res = await fetch(getApiUrl('/api/v1/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: 'admin@cloudtask.dev', password: 'AdminSecurePass123!' })
@@ -800,12 +832,12 @@ async def real_time_dashboard():
         if (res.ok) {
           const data = await res.json();
           authToken = data.access_token;
-          localStorage.setItem('cloudtask_token', authToken);
+          setStorageToken(authToken);
           updateConnectionStatus(true);
           return authToken;
         } else {
           if (res.status === 404) updateConnectionStatus(false);
-          localStorage.removeItem('cloudtask_token');
+          setStorageToken('');
           authToken = '';
         }
       } catch (err) {
@@ -820,13 +852,13 @@ async def real_time_dashboard():
       if (!token) return;
 
       try {
-        let res = await fetch('/api/v1/tasks?limit=100', {
+        let res = await fetch(getApiUrl('/api/v1/tasks?limit=100'), {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.status === 401) {
           token = await ensureAuth(true);
           if (token) {
-            res = await fetch('/api/v1/tasks?limit=100', {
+            res = await fetch(getApiUrl('/api/v1/tasks?limit=100'), {
               headers: { 'Authorization': `Bearer ${token}` }
             });
           }
@@ -905,11 +937,12 @@ async def real_time_dashboard():
       applyFiltersAndRender();
     }
 
-    function setMobileView(tab) {
+    function setMobileView(tab, e) {
       activeMobileTab = tab;
       const pills = document.querySelectorAll('.tab-pill');
       pills.forEach(p => p.classList.remove('active'));
-      event.target.classList.add('active');
+      const activePill = (e && e.target) ? e.target : document.querySelector(`.tab-pill[onclick*="'${tab}'"]`);
+      if (activePill) activePill.classList.add('active');
 
       const colMap = {
         QUEUED: document.getElementById('col-container-queued'),
@@ -1188,22 +1221,28 @@ async def real_time_dashboard():
     }
 
     async function handleDispatch(e) {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
       const btn = document.getElementById('submit-btn');
       const fb = document.getElementById('dispatch-feedback');
       btn.disabled = true;
       btn.innerText = 'Dispatching...';
-      if (fb) fb.style.display = 'none';
+      if (fb) {
+        fb.style.display = 'block';
+        fb.style.background = 'rgba(59, 130, 246, 0.12)';
+        fb.style.border = '1px solid rgba(59, 130, 246, 0.35)';
+        fb.style.color = '#93C5FD';
+        fb.innerHTML = '<strong>Submitting task to cluster...</strong>';
+      }
 
       let token = await ensureAuth();
-      let title = document.getElementById('task-title').value.trim();
+      let title = (document.getElementById('task-title').value || '').trim();
       if (!title) {
         title = 'Quick Task #' + Date.now().toString().slice(-4);
       }
       const task_type = document.getElementById('task-type').value;
       const priority = parseInt(document.getElementById('task-priority').value, 10);
       const delay = parseInt(document.getElementById('task-delay').value, 10) || 0;
-      const webhook = document.getElementById('task-webhook').value.trim() || null;
+      const webhook = (document.getElementById('task-webhook').value || '').trim() || null;
       const dedupCheckbox = document.getElementById('task-dedup');
       const preventDuplicates = dedupCheckbox ? dedupCheckbox.checked : true;
 
@@ -1218,7 +1257,7 @@ async def real_time_dashboard():
         };
         if (webhook) payloadBody.webhook_url = webhook;
 
-        let res = await fetch('/api/v1/tasks', {
+        let res = await fetch(getApiUrl('/api/v1/tasks'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1230,7 +1269,7 @@ async def real_time_dashboard():
         // Token expired check
         if (res.status === 401) {
           token = await ensureAuth(true);
-          res = await fetch('/api/v1/tasks', {
+          res = await fetch(getApiUrl('/api/v1/tasks'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1264,15 +1303,29 @@ async def real_time_dashboard():
               fb.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
                   <div>
-                    <strong>Task Enqueued:</strong> "${createdTask.title}"<br>
-                    <span style="font-family:monospace; font-size:0.75rem; color:#94A3B8;">ID: ${createdTask.id} | Priority: P${createdTask.priority} | Status: ${createdTask.status} | Trace: ${createdTask.trace_id || 'N/A'}</span>
+                    <div style="font-weight:700; font-size:0.95rem; color:#FFFFFF; margin-bottom:4px;">
+                      Task Accepted by Cluster (Status: <span id="fb-status-${createdTask.id}">${createdTask.status}</span>)
+                    </div>
+                    <div style="color:#A7F3D0; font-size:0.85rem; margin-bottom:4px;">
+                      <strong>${createdTask.title}</strong> [${createdTask.task_type}] &bull; Priority P${createdTask.priority}
+                    </div>
+                    <div style="font-family:monospace; font-size:0.75rem; color:#94A3B8;">
+                      Task ID: ${createdTask.id} &bull; Trace: ${createdTask.trace_id || 'N/A'}
+                    </div>
+                    <div id="fb-result-${createdTask.id}" style="margin-top:6px; font-size:0.8rem; color:#38BDF8; font-family:monospace;">
+                      Waiting for worker pickup...
+                    </div>
                   </div>
-                  <div style="display:flex; gap:8px;">
+                  <div style="display:flex; gap:8px; align-self:flex-start;">
                     <button type="button" class="btn btn-xs btn-primary" onclick="openTaskModal('${createdTask.id}')">Inspect</button>
                     <button type="button" class="btn btn-xs btn-success" onclick="startPriorityProcessing()" style="background:#10B981;">Process Queue</button>
                   </div>
                 </div>
               `;
+              fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+              // Poll for live task execution outcome and display returned result
+              pollTaskResult(createdTask.id);
             }
           }
           fetchTasks();
@@ -1292,6 +1345,7 @@ async def real_time_dashboard():
             fb.style.border = '1px solid rgba(239, 68, 68, 0.4)';
             fb.style.color = '#FCA5A5';
             fb.innerHTML = `<strong>Error:</strong> ${errMsg}`;
+            fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           } else {
             alert(errMsg.replace(/<[^>]*>/g, ''));
           }
@@ -1306,12 +1360,46 @@ async def real_time_dashboard():
           fbErr.style.border = '1px solid rgba(239, 68, 68, 0.4)';
           fbErr.style.color = '#FCA5A5';
           fbErr.innerHTML = `<strong>Dispatch Error:</strong> ${err.message}. If running locally, please start the engine using <code>./run_local.sh</code> or <code>make run</code> instead of a static file server.`;
+          fbErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
           alert('Dispatch error: ' + err.message);
         }
         btn.disabled = false;
         btn.innerText = 'Enqueue Task';
       }
+    }
+
+    function pollTaskResult(taskId) {
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        await fetchTasks();
+        const t = allTasks.find(x => x.id === taskId);
+        if (t) {
+          const statusEl = document.getElementById(`fb-status-${taskId}`);
+          const resEl = document.getElementById(`fb-result-${taskId}`);
+          if (statusEl) statusEl.innerText = t.status;
+          if (t.status === 'SUCCESS') {
+            if (resEl) {
+              resEl.style.color = '#34D399';
+              resEl.innerHTML = `<strong>Result Returned:</strong> <code>${JSON.stringify(t.result || { status: 'SUCCESS' })}</code>`;
+            }
+            clearInterval(interval);
+          } else if (t.status === 'FAILED' || t.status === 'DEAD_LETTERED') {
+            if (resEl) {
+              resEl.style.color = '#F87171';
+              resEl.innerHTML = `<strong>Execution Failed:</strong> ${t.error_message || 'Task failed'}`;
+            }
+            clearInterval(interval);
+          } else if (t.status === 'RUNNING') {
+            if (resEl) {
+              resEl.style.color = '#38BDF8';
+              resEl.innerHTML = `Worker executing task (${t.progress || 25}%)...`;
+            }
+          }
+        }
+        if (attempts >= 25) clearInterval(interval);
+      }, 350);
     }
 
     async function replayAllDLQ() {
@@ -1323,13 +1411,13 @@ async def real_time_dashboard():
       }
       try {
         let token = await ensureAuth();
-        let res = await fetch('/api/v1/tasks/dlq/replay-all', {
+        let res = await fetch(getApiUrl('/api/v1/tasks/dlq/replay-all'), {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.status === 401) {
           token = await ensureAuth(true);
-          res = await fetch('/api/v1/tasks/dlq/replay-all', {
+          res = await fetch(getApiUrl('/api/v1/tasks/dlq/replay-all'), {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -1348,49 +1436,65 @@ async def real_time_dashboard():
         if (btn) { btn.disabled = false; btn.innerText = originalText; }
       }
     }
-
     let lastExportedCsv = '';
 
     async function exportTasksCsv() {
       let token = await ensureAuth();
       const btn = document.getElementById('export-btn');
-      btn.innerText = 'Exporting...';
+      const originalText = btn ? btn.innerText : 'Export CSV';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Exporting...';
+      }
       let csvContent = '';
       let taskCount = 0;
 
       try {
-        let res = await fetch('/api/v1/tasks/export?format=csv', {
+        let res = await fetch(getApiUrl('/api/v1/tasks/export?format=csv'), {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.status === 401) {
           token = await ensureAuth(true);
-          res = await fetch('/api/v1/tasks/export?format=csv', {
+          res = await fetch(getApiUrl('/api/v1/tasks/export?format=csv'), {
             headers: { 'Authorization': `Bearer ${token}` }
           });
         }
         if (res.ok) {
           csvContent = await res.text();
-          taskCount = Math.max(0, csvContent.trim().split('\n').length - 1);
+          const lines = csvContent.trim().split('\n').filter(l => l.trim().length > 0);
+          taskCount = Math.max(0, lines.length - 1);
         } else {
           const clientData = buildClientSideCsv();
           csvContent = clientData.content;
           taskCount = clientData.count;
         }
       } catch (err) {
+        console.warn('Backend export fallback:', err);
+        const clientData = buildClientSideCsv();
+        csvContent = clientData.content;
+        taskCount = clientData.count;
+      }
+
+      if (!csvContent || csvContent.trim().length === 0) {
         const clientData = buildClientSideCsv();
         csvContent = clientData.content;
         taskCount = clientData.count;
       }
 
       lastExportedCsv = csvContent;
-      btn.innerText = 'Exported';
-      setTimeout(() => btn.innerText = 'Export CSV', 2000);
+      if (btn) {
+        btn.innerText = `Exported (${taskCount})`;
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerText = originalText;
+        }, 2000);
+      }
 
-      // Trigger browser file download
-      triggerCsvDownload();
-
-      // Display CSV data on screen in interactive preview modal
+      // 1. Display CSV data in modal preview immediately
       showCsvExportModal(csvContent, taskCount);
+
+      // 2. Trigger browser file download
+      triggerCsvDownload();
     }
 
     function buildClientSideCsv() {
@@ -1414,16 +1518,38 @@ async def real_time_dashboard():
     function triggerCsvDownload() {
       if (!lastExportedCsv) return;
       try {
+        const filename = `cloudtask_audit_${Date.now()}.csv`;
         const blob = new Blob([lastExportedCsv], { type: 'text/csv;charset=utf-8;' });
+        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+          window.navigator.msSaveOrOpenBlob(blob, filename);
+          return;
+        }
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `cloudtask_audit_${Date.now()}.csv`;
+        a.setAttribute('download', filename);
+        a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          } catch (e) {}
+        }, 300);
       } catch (e) {
-        console.warn('Direct file download error:', e);
+        console.warn('Direct file download fallback:', e);
+        try {
+          const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lastExportedCsv);
+          const link = document.createElement('a');
+          link.setAttribute('href', encodedUri);
+          link.setAttribute('download', `cloudtask_audit_${Date.now()}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          setTimeout(() => { try { document.body.removeChild(link); } catch (e) {} }, 300);
+        } catch (e2) {
+          console.warn('Data URI download fallback:', e2);
+        }
       }
     }
 
@@ -1431,9 +1557,11 @@ async def real_time_dashboard():
       const modal = document.getElementById('csv-export-modal');
       const preview = document.getElementById('csv-export-preview');
       const countEl = document.getElementById('csv-export-count');
-      if (countEl) countEl.innerText = count || (csvText ? Math.max(0, csvText.trim().split('\n').length - 1) : 0);
+      if (countEl) countEl.innerText = count !== undefined ? count : (csvText ? Math.max(0, csvText.trim().split('\n').length - 1) : 0);
       if (preview) preview.innerText = csvText || '(No tasks recorded)';
-      if (modal) modal.style.display = 'flex';
+      if (modal) {
+        modal.style.display = 'flex';
+      }
     }
 
     function closeCsvExportModal() {
@@ -1455,13 +1583,13 @@ async def real_time_dashboard():
 
     async function cancelTask(taskId) {
       let token = await ensureAuth();
-      let res = await fetch(`/api/v1/tasks/${taskId}/cancel`, {
+      let res = await fetch(getApiUrl(`/api/v1/tasks/${taskId}/cancel`), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
         token = await ensureAuth(true);
-        await fetch(`/api/v1/tasks/${taskId}/cancel`, {
+        await fetch(getApiUrl(`/api/v1/tasks/${taskId}/cancel`), {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1471,13 +1599,13 @@ async def real_time_dashboard():
 
     async function retryTask(taskId) {
       let token = await ensureAuth();
-      let res = await fetch(`/api/v1/tasks/${taskId}/retry`, {
+      let res = await fetch(getApiUrl(`/api/v1/tasks/${taskId}/retry`), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 401) {
         token = await ensureAuth(true);
-        await fetch(`/api/v1/tasks/${taskId}/retry`, {
+        await fetch(getApiUrl(`/api/v1/tasks/${taskId}/retry`), {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1485,15 +1613,15 @@ async def real_time_dashboard():
       fetchTasks();
     }
 
-    let currentExecutionMode = 'manual';
+    let currentExecutionMode = 'auto';
     let isProcessingQueue = false;
 
     async function fetchExecutionMode() {
       try {
-        let res = await fetch('/api/v1/tasks/execution-mode');
+        let res = await fetch(getApiUrl('/api/v1/tasks/execution-mode'));
         if (res.ok) {
           const data = await res.json();
-          currentExecutionMode = data.mode || 'manual';
+          currentExecutionMode = data.mode || 'auto';
           updateModeUI();
         }
       } catch (err) {
@@ -1504,10 +1632,15 @@ async def real_time_dashboard():
     function updateModeUI() {
       const badge = document.getElementById('mode-badge');
       const guidance = document.getElementById('mode-guidance-text');
+      const btn = document.getElementById('mode-toggle-btn');
       if (currentExecutionMode === 'auto') {
         if (badge) {
           badge.innerText = 'Auto-Start';
           badge.style.color = '#34D399';
+        }
+        if (btn) {
+          btn.style.borderColor = '#10B981';
+          btn.style.color = '#6EE7B7';
         }
         if (guidance) {
           guidance.innerHTML = '<strong>Auto-Start Mode:</strong> Tasks execute automatically in background as soon as they are submitted.';
@@ -1516,6 +1649,10 @@ async def real_time_dashboard():
         if (badge) {
           badge.innerText = 'Manual (Staged)';
           badge.style.color = '#38BDF8';
+        }
+        if (btn) {
+          btn.style.borderColor = '#3B82F6';
+          btn.style.color = '#93C5FD';
         }
         if (guidance) {
           guidance.innerHTML = '<strong>Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>Start Processing</strong> to execute in priority order (P10 to P1).';
@@ -1528,7 +1665,7 @@ async def real_time_dashboard():
       const btn = document.getElementById('mode-toggle-btn');
       if (btn) btn.disabled = true;
       try {
-        let res = await fetch('/api/v1/tasks/execution-mode', {
+        let res = await fetch(getApiUrl('/api/v1/tasks/execution-mode'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: targetMode })
@@ -1562,7 +1699,7 @@ async def real_time_dashboard():
       }
       try {
         let token = await ensureAuth();
-        let res = await fetch('/api/v1/tasks/clear-history', {
+        let res = await fetch(getApiUrl('/api/v1/tasks/clear-history'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1571,7 +1708,7 @@ async def real_time_dashboard():
         });
         if (res.status === 401) {
           token = await ensureAuth(true);
-          res = await fetch('/api/v1/tasks/clear-history', {
+          res = await fetch(getApiUrl('/api/v1/tasks/clear-history'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1629,7 +1766,7 @@ async def real_time_dashboard():
       }
 
       try {
-        await fetch('/api/v1/tasks/start-processing', {
+        await fetch(getApiUrl('/api/v1/tasks/start-processing'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });

@@ -2,65 +2,1486 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CloudTask Engine - Local Gateway</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>CloudTask - Enterprise Distributed Task Dashboard</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <style>
     :root {
       --bg: #080C15;
       --card-bg: #0F172A;
+      --card-inner: #0B1120;
       --card-border: #1E293B;
+      --card-border-light: #334155;
       --primary: #2563EB;
+      --primary-hover: #1D4ED8;
       --success: #10B981;
       --warning: #F59E0B;
+      --danger: #EF4444;
       --text: #F8FAFC;
       --text-muted: #94A3B8;
+      --radius: 10px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 32px 16px; min-height: 100vh; line-height: 1.5; }
-    .container { max-width: 800px; margin: 0 auto; width: 100%; }
-    .header { text-align: center; margin-bottom: 30px; }
-    .badge { display: inline-block; background: rgba(37,99,235,0.15); color: #60A5FA; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; margin-bottom: 10px; border: 1px solid rgba(37,99,235,0.3); }
-    h1 { font-size: 2rem; font-weight: 800; color: #FFFFFF; margin-bottom: 8px; }
-    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 18px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 0.9rem; cursor: pointer; border: none; transition: all 0.2s; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 16px 12px; min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    .container { max-width: 1400px; margin: 0 auto; width: 100%; }
+
+    /* Top Navigation */
+    .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 14px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.15rem; color: #FFFFFF; }
+    .nav-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn { padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; touch-action: manipulation; }
+    .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
     .btn-success { background: var(--success); color: #fff; }
-    .btn-secondary { background: #1E293B; color: var(--text); border: 1px solid #334155; }
-    .btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-    .code-block { background: #050811; border: 1px solid var(--card-border); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 0.85rem; color: #A7F3D0; overflow-x: auto; margin-top: 10px; }
-    .notice { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 0.88rem; color: #FCD34D; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--card-border); }
+    .btn-secondary:hover { background: #1E293B; }
+
+    /* Cluster Status Banner */
+    .cluster-banner { background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: 8px; padding: 8px 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #93C5FD; flex-wrap: wrap; gap: 8px; }
+    .status-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.18); color: #34D399; padding: 3px 10px; border-radius: 9999px; font-weight: 600; font-size: 0.75rem; }
+    .pulse-dot { width: 8px; height: 8px; background: #10B981; border-radius: 50%; box-shadow: 0 0 8px #10B981; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+    /* Metrics Bar */
+    .metrics-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .metric-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px 16px; transition: transform 0.2s; }
+    .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em; }
+    .metric-val { font-size: 1.7rem; font-weight: 800; margin-top: 4px; line-height: 1.1; }
+
+    /* Filter & Search Toolbar */
+    .filter-toolbar { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .search-box { display: flex; align-items: center; gap: 8px; background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 6px; padding: 6px 12px; flex: 1; min-width: 220px; }
+    .search-box input { background: transparent; border: none; outline: none; color: #fff; font-size: 0.85rem; width: 100%; }
+    .filter-selects { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .filter-select { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 6px; padding: 7px 10px; color: #fff; font-size: 0.82rem; outline: none; cursor: pointer; }
+
+    /* Quick Dispatcher Form */
+    .dispatch-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; transition: all 0.3s ease; }
+    .dispatch-box h3 { font-size: 1rem; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+    .form-control { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 6px; padding: 8px 10px; color: #fff; font-size: 0.85rem; outline: none; }
+    .form-control:focus { border-color: var(--primary); }
+
+    /* Mobile Segmented Control Tabs */
+    .mobile-tabs { display: none; margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; gap: 6px; }
+    .tab-pill { padding: 6px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-muted); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .tab-pill.active { background: #2563EB; color: #fff; border-color: #3B82F6; }
+
+    /* Kanban Grid */
+    .kanban-board-wrapper { width: 100%; overflow-x: auto; padding-bottom: 12px; }
+    .kanban-grid { display: grid; grid-template-columns: repeat(4, minmax(260px, 1fr)); gap: 14px; align-items: stretch; min-width: 1080px; }
+    .kanban-col { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; height: 640px; max-height: 72vh; box-sizing: border-box; }
+    .col-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--card-border); margin-bottom: 12px; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; flex-shrink: 0; }
+    .kanban-tasks { flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 4px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .kanban-tasks::-webkit-scrollbar { width: 6px; }
+    .kanban-tasks::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.4); border-radius: 4px; }
+    .kanban-tasks::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .kanban-tasks::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Task Card */
+    .task-card { background: var(--card-inner); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; margin-bottom: 10px; transition: all 0.2s; cursor: pointer; flex-shrink: 0; }
+    .task-card:hover { border-color: #3B82F6; transform: translateY(-1px); }
+    .task-title { font-weight: 600; font-size: 0.88rem; color: #FFFFFF; margin-bottom: 6px; word-break: break-word; }
+    .task-meta { font-size: 0.72rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .tag { background: #1E293B; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; }
+    .tag-prio { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+    .tag-delay { background: rgba(139, 92, 246, 0.2); color: #A78BFA; }
+    .tag-wh { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+    .progress-bar { width: 100%; height: 5px; background: #1F2937; border-radius: 9999px; overflow: hidden; margin: 6px 0; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #3B82F6, #10B981); transition: width 0.4s; }
+    .card-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .btn-xs { padding: 4px 8px; font-size: 0.72rem; border-radius: 4px; }
+
+    /* Modal Component (Slide-over/Bottom-sheet on mobile, centered on desktop) */
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 99999; justify-content: center; align-items: center; padding: 12px; }
+    .modal-dialog { background: #0F172A; border: 1px solid #334155; border-radius: 12px; width: 100%; max-width: 720px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.6); animation: modalIn 0.2s ease-out; }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+    .modal-header { padding: 14px 18px; border-bottom: 1px solid #1E293B; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 1.05rem; font-weight: 700; color: #fff; word-break: break-all; }
+    .modal-close { background: transparent; border: none; color: #94A3B8; font-size: 1.3rem; cursor: pointer; padding: 4px 8px; }
+    .modal-body { padding: 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; font-size: 0.85rem; }
+    .modal-footer { padding: 12px 18px; border-top: 1px solid #1E293B; display: flex; justify-content: flex-end; gap: 10px; background: #0B1120; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    .detail-item { background: #0B1120; border: 1px solid #1E293B; border-radius: 6px; padding: 8px 12px; }
+    .detail-label { font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+    .detail-val { font-size: 0.85rem; color: #F1F5F9; word-break: break-all; font-family: monospace; display: flex; align-items: center; justify-content: space-between; }
+    .code-block { background: #050811; border: 1px solid #1E293B; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 0.78rem; color: #A7F3D0; overflow-x: auto; max-height: 180px; }
+    .attempt-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 6px; }
+    .attempt-table th, .attempt-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #1E293B; }
+    .attempt-table th { color: #94A3B8; text-transform: uppercase; font-size: 0.7rem; }
+
+    /* Media Queries for Mobile and Tablet */
+    @media (max-width: 820px) {
+      body { padding: 10px 8px; }
+      .container { max-width: 100%; }
+      .metrics-bar { grid-template-columns: repeat(2, 1fr); }
+      .mobile-tabs { display: flex; }
+      .kanban-board-wrapper { overflow-x: visible; }
+      .kanban-grid { grid-template-columns: 1fr; min-width: 0; }
+      .kanban-col { height: auto; max-height: none; min-height: 250px; }
+      .kanban-tasks { max-height: 480px; }
+      .kanban-col.mobile-hidden { display: none !important; }
+      .filter-toolbar { flex-direction: column; align-items: stretch; }
+      .search-box { width: 100%; }
+      .filter-selects { width: 100%; justify-content: space-between; }
+      .filter-select { flex: 1; }
+      .modal-backdrop { align-items: flex-end; padding: 0; }
+      .modal-dialog { border-radius: 16px 16px 0 0; max-height: 85vh; }
+      .nav-links .btn { padding: 6px 10px; font-size: 0.78rem; }
+    }
+
+    @media (max-width: 520px) {
+      .metrics-bar { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .metric-card { padding: 10px 12px; }
+      .metric-val { font-size: 1.4rem; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <span class="badge">CloudTask Local Gateway</span>
-      <h1>CloudTask Platform Launcher</h1>
-      <p style="color:var(--text-muted); font-size:0.95rem;">Distributed Asynchronous Task Orchestration & Worker Engine</p>
+    <!-- Server Offline / Static Server Notice -->
+    <div id="offline-alert" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#FCA5A5; font-size:0.85rem; line-height:1.5;">
+      <strong>Backend Offline / Static Server Notice:</strong> The dashboard cannot communicate with the FastAPI backend. If you are serving files using <code>python -m http.server</code>, API operations (task enqueueing, queue processing, CSV audit streaming) will not run. Please execute <code>./run_local.sh</code> or <code>make run</code> in your terminal to start the live engine with full API and worker support.
     </div>
 
-    <div class="notice">
-      <strong>Static Server Notice:</strong> If you are viewing this page through <code>python -m http.server</code>, the Python FastAPI backend and task workers are not running yet. Use the command below to start the live engine with full API support.
+    <!-- Navbar -->
+    <div class="nav">
+      <div class="nav-brand">
+        <span>CloudTask Engine</span>
+        <div class="status-pill">
+          <div class="pulse-dot"></div>
+          <span>Active</span>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="/" class="btn btn-secondary">← Portal</a>
+        <a href="/docs" class="btn btn-secondary">API Docs</a>
+        <button onclick="toggleExecutionMode()" class="btn btn-secondary" id="mode-toggle-btn" title="Toggle between manual batch staging and instant auto-dispatch" style="border: 1px solid #10B981; color: #6EE7B7;">Mode: <span id="mode-badge" style="font-weight:700; color:#34D399;">Auto-Start</span></button>
+        <button onclick="startPriorityProcessing()" class="btn btn-success" id="start-btn" style="background:#10B981; box-shadow:0 0 14px rgba(16,185,129,0.4); font-weight:700; padding:8px 16px;">Start Processing (<span id="start-count">0</span>)</button>
+        <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">Export CSV</button>
+        <button onclick="toggleDispatcher()" class="btn btn-primary" id="toggle-dispatch-btn">New Task</button>
+        <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">Refresh</button>
+      </div>
     </div>
 
-    <div class="card">
-      <h3 style="color:#FFFFFF; margin-bottom:8px;">Start Full Engine Locally</h3>
-      <p style="color:var(--text-muted); font-size:0.88rem;">Run this single command in your CloudForge terminal to start the API gateway, SQLite database, and background worker loop:</p>
-      <pre class="code-block">./run_local.sh</pre>
-      <div style="font-size:0.8rem; color:#64748B; margin-top:6px;">Alternative: <code>python services/api-gateway/main.py</code> or <code>make run</code></div>
+    <!-- Cluster Fleet Summary Banner -->
+    <div class="cluster-banner" id="status-banner">
+      <div id="mode-guidance-text"><strong>Auto-Start Mode:</strong> Tasks execute automatically in background as soon as they are submitted.</div>
+      <div id="filter-count-badge" style="font-weight:600;">Showing 0 tasks</div>
     </div>
 
-    <div class="card">
-      <h3 style="color:#FFFFFF; margin-bottom:8px;">Access Live Environments</h3>
-      <p style="color:var(--text-muted); font-size:0.88rem;">Once running, or to use the cloud deployment, access the dashboard and API docs below:</p>
-      <div class="btn-group">
-        <a href="http://localhost:8000/dashboard" class="btn btn-primary">Local Dashboard (:8000)</a>
-        <a href="https://cloudtask-platform.onrender.com/dashboard" class="btn btn-success" target="_blank">Cloud Dashboard (Render)</a>
-        <a href="http://localhost:8000/docs" class="btn btn-secondary">API Docs (/docs)</a>
-        <a href="https://github.com/venkatnikhil616/CloudForge" class="btn btn-secondary" target="_blank">GitHub Repository</a>
+    <!-- Metrics Bar -->
+    <div class="metrics-bar">
+      <div class="metric-card">
+        <div class="metric-label">Total Tasks</div>
+        <div class="metric-val" id="total-count" style="color: #60A5FA;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Queued / Ready</div>
+        <div class="metric-val" id="queued-count" style="color: #FBBF24;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Running in Fleet</div>
+        <div class="metric-val" id="running-count" style="color: #38BDF8;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Successfully Finished</div>
+        <div class="metric-val" id="success-count" style="color: #34D399;">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Dead Letter Queue</div>
+        <div class="metric-val" id="dlq-count" style="color: #F87171;">0</div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="filter-toolbar">
+      <div class="search-box">
+        <input type="text" id="task-search" placeholder="Search tasks by title, ID, or trace..." oninput="handleSearch(this.value)" />
+      </div>
+      <div class="filter-selects">
+        <select id="filter-type" class="filter-select" onchange="applyFilters()">
+          <option value="">All Task Types</option>
+          <option value="report_generation">report_generation</option>
+          <option value="data_processing">data_processing</option>
+          <option value="email_dispatch">email_dispatch</option>
+          <option value="system_cleanup">system_cleanup</option>
+        </select>
+        <select id="filter-priority" class="filter-select" onchange="applyFilters()">
+          <option value="">All Priorities</option>
+          <option value="10">Priority 10 (Critical)</option>
+          <option value="8">Priority 8 (High)</option>
+          <option value="5">Priority 5 (Normal)</option>
+          <option value="1">Priority 1 (Low)</option>
+        </select>
+        <select id="filter-duplicate" class="filter-select" onchange="applyFilters()">
+          <option value="">All Tasks</option>
+          <option value="duplicates">Duplicates Only</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Quick Dispatcher Form -->
+    <div class="dispatch-box" id="dispatch-panel" style="display: block;">
+      <h3>
+        <span>Dispatch Asynchronous Task to Cluster</span>
+      </h3>
+      <form id="task-form" onsubmit="handleDispatch(event); return false;">
+        <div class="form-grid">
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label>Task Title</label>
+              <span id="duplicate-warning" style="display:none; font-size:0.72rem; color:#F59E0B; font-weight:600;">Duplicate Detected</span>
+            </div>
+            <input type="text" id="task-title" class="form-control" placeholder="e.g. Ingest Customer Ledger" oninput="checkDuplicateInline()" />
+          </div>
+          <div class="form-group">
+            <label>Handler Type</label>
+            <select id="task-type" class="form-control" onchange="checkDuplicateInline()">
+              <option value="report_generation">report_generation (PDF Export)</option>
+              <option value="data_processing">data_processing (ETL Batch)</option>
+              <option value="email_dispatch">email_dispatch (Transactional Email)</option>
+              <option value="system_cleanup">system_cleanup (Purge Temp Records)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Priority</label>
+            <select id="task-priority" class="form-control">
+              <option value="10">10 - Critical Priority</option>
+              <option value="8" selected>8 - High Priority</option>
+              <option value="5">5 - Normal Priority</option>
+              <option value="1">1 - Low Priority</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Delay Countdown (Seconds)</label>
+            <input type="number" id="task-delay" class="form-control" placeholder="0 (Immediate)" min="0" max="86400" value="0" />
+          </div>
+          <div class="form-group">
+            <label>Webhook Callback URL (HMAC Signed)</label>
+            <input type="text" id="task-webhook" class="form-control" placeholder="https://api.example.com/webhook (Optional)" />
+          </div>
+          <div class="form-group" style="align-self: flex-end;">
+            <button type="button" onclick="handleDispatch(event)" class="btn btn-success" style="width: 100%; padding: 10px; justify-content: center;" id="submit-btn">
+              Enqueue Task
+            </button>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:-4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05);">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:#94A3B8; cursor:pointer; margin:0;">
+              <input type="checkbox" id="task-dedup" checked style="cursor:pointer;" />
+              <span>Duplicate Detection Guard (Reject duplicate active tasks)</span>
+            </label>
+            <span id="dup-status-hint" style="font-size:0.75rem; color:#64748B;">Active deduplication enabled</span>
+          </div>
+        </div>
+      </form>
+      <!-- Inline Task Dispatch Feedback / Return Banner -->
+      <div id="dispatch-feedback" style="display:none; margin-top:14px; padding:12px 14px; border-radius:8px; font-size:0.85rem;"></div>
+    </div>
+
+    <!-- Mobile Segmented Tabs -->
+    <div class="mobile-tabs" id="mobile-tabs">
+      <button class="tab-pill active" onclick="setMobileView('ALL', event)">All (<span id="m-all">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('QUEUED', event)">Queued (<span id="m-queued">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('RUNNING', event)">Running (<span id="m-running">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('SUCCESS', event)">Success (<span id="m-success">0</span>)</button>
+      <button class="tab-pill" onclick="setMobileView('DEAD_LETTERED', event)">DLQ (<span id="m-dlq">0</span>)</button>
+    </div>
+
+    <!-- Kanban Grid -->
+    <div class="kanban-board-wrapper">
+      <div class="kanban-grid">
+        <div class="kanban-col" id="col-container-queued">
+          <div class="col-header">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>QUEUED / STAGED</span>
+              <span id="badge-queued" class="tag">0</span>
+            </div>
+            <button onclick="startPriorityProcessing()" class="btn btn-success btn-xs" id="col-start-btn" style="background:#10B981; padding:3px 8px; font-weight:700;" title="Run all queued tasks in Priority Order">Process Queue</button>
+          </div>
+          <div id="col-queued" class="kanban-tasks"></div>
+        </div>
+        <div class="kanban-col" id="col-container-running">
+          <div class="col-header">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>RUNNING (Worker)</span>
+              <span id="badge-running" class="tag">0</span>
+            </div>
+          </div>
+          <div id="col-running" class="kanban-tasks"></div>
+        </div>
+        <div class="kanban-col" id="col-container-success">
+          <div class="col-header">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>COMPLETED</span>
+              <span id="badge-success" class="tag">0</span>
+            </div>
+            <button onclick="clearHistory()" class="btn btn-secondary btn-xs" id="clear-history-btn" title="Clear completed tasks history" style="padding:2px 8px; font-weight:600;">Clear History</button>
+          </div>
+          <div id="col-success" class="kanban-tasks"></div>
+        </div>
+        <div class="kanban-col" id="col-container-dlq">
+          <div class="col-header">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>DEAD_LETTERED / FAILED</span>
+              <span id="badge-dlq" class="tag">0</span>
+            </div>
+            <button id="replay-all-btn" onclick="replayAllDLQ()" class="btn btn-danger btn-xs" title="Replay all DLQ tasks" style="padding: 2px 7px;">Replay All</button>
+          </div>
+          <div id="col-dlq" class="kanban-tasks"></div>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Interactive Task Inspection Modal (Temporal / Flower inspired) -->
+  <div class="modal-backdrop" id="task-modal" onclick="handleBackdropClick(event)">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="modal-status-badge" class="tag">STATUS</span>
+          <h3 id="modal-title">Task Inspection</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="closeTaskModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Metadata Grid -->
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Task ID</div>
+            <div class="detail-val">
+              <span id="modal-task-id" style="font-size:0.75rem;">-</span>
+              <button onclick="copyModalField('modal-task-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">Copy</button>
+            </div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Distributed Trace ID</div>
+            <div class="detail-val">
+              <span id="modal-trace-id" style="font-size:0.75rem;">-</span>
+              <button onclick="copyModalField('modal-trace-id', this)" class="btn-xs btn-secondary" style="margin-left:6px;">Copy</button>
+            </div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Task Type & Priority</div>
+            <div class="detail-val" id="modal-type-prio">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Scheduled Delay / Webhook</div>
+            <div class="detail-val" id="modal-delay-webhook">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Created Timestamp</div>
+            <div class="detail-val" id="modal-created">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Updated Timestamp</div>
+            <div class="detail-val" id="modal-updated">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Duplicate Status</div>
+            <div class="detail-val" id="modal-dup-status"><span style="color:#34D399;">Unique</span></div>
+          </div>
+        </div>
+
+        <!-- Payload viewer -->
+        <div>
+          <div class="detail-label" style="margin-bottom: 4px;">Task Payload JSON</div>
+          <pre class="code-block" id="modal-payload">{}</pre>
+        </div>
+
+        <!-- Result / Error viewer -->
+        <div id="modal-result-section">
+          <div class="detail-label" style="margin-bottom: 4px;">Execution Result / Error Output</div>
+          <pre class="code-block" id="modal-result" style="color: #34D399;">None</pre>
+        </div>
+
+        <!-- Execution Attempts Timeline -->
+        <div>
+          <div class="detail-label" style="margin-bottom: 4px;">Worker Attempt Timeline & Logs</div>
+          <div style="background:#0B1120; border:1px solid #1E293B; border-radius:6px; overflow-x:auto;">
+            <table class="attempt-table">
+              <thead>
+                <tr>
+                  <th>Attempt</th>
+                  <th>Worker ID</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Started At</th>
+                </tr>
+              </thead>
+              <tbody id="modal-attempts-body">
+                <tr><td colspan="5" style="color:#94A3B8; text-align:center;">No attempts recorded yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" id="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSV Export Preview Modal -->
+  <div class="modal-backdrop" id="csv-export-modal" onclick="handleCsvBackdropClick(event)">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Task Audit CSV Export</h3>
+        <button type="button" class="modal-close" onclick="closeCsvExportModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:0.85rem; color:#94A3B8; margin-bottom:6px;">
+          Export generated: <strong id="csv-export-count" style="color:#38BDF8;">0</strong> task records.
+        </div>
+        <div style="font-size:0.75rem; color:#64748B; margin-bottom:12px;">
+          Browser file download was initiated. If your browser blocks popups or file downloads, you can directly download or copy the CSV data below:
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-primary btn-xs" onclick="triggerCsvDownload()" id="modal-download-btn">Download CSV File</button>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="copyCsvPreview(this)" id="modal-copy-btn">Copy to Clipboard</button>
+        </div>
+        <div class="detail-label" style="margin-bottom: 4px;">CSV Output Stream</div>
+        <pre class="code-block" id="csv-export-preview" style="max-height: 240px; white-space: pre; overflow-x: auto; font-size: 0.76rem; color: #34D399;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeCsvExportModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getStorageToken() {
+      try { return localStorage.getItem('cloudtask_token') || ''; } catch (e) { return ''; }
+    }
+    function setStorageToken(val) {
+      try {
+        if (val) localStorage.setItem('cloudtask_token', val);
+        else localStorage.removeItem('cloudtask_token');
+      } catch (e) {}
+    }
+
+    // Smart Base URL resolver: seamlessly supports same-origin, file://, and static web servers (like port 8080)
+    function getApiUrl(path) {
+      const cleanPath = path.startsWith('/') ? path : '/' + path;
+      if (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '8000')) {
+        return 'https://cloudtask-platform.onrender.com' + cleanPath;
+      }
+      return cleanPath;
+    }
+
+    let authToken = getStorageToken();
+    let allTasks = [];
+    let currentSearch = '';
+    let currentTypeFilter = '';
+    let currentPriorityFilter = '';
+    let currentDuplicateFilter = '';
+    let activeMobileTab = 'ALL';
+    let currentModalTaskId = null;
+
+    let isServerOnline = true;
+
+    function updateConnectionStatus(online) {
+      isServerOnline = online;
+      const alertEl = document.getElementById('offline-alert');
+      if (alertEl) alertEl.style.display = online ? 'none' : 'block';
+    }
+
+    async function ensureAuth(forceRefresh = false) {
+      if (authToken && !forceRefresh) return authToken;
+      try {
+        const res = await fetch(getApiUrl('/api/v1/auth/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@cloudtask.dev', password: 'AdminSecurePass123!' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          authToken = data.access_token;
+          setStorageToken(authToken);
+          updateConnectionStatus(true);
+          return authToken;
+        } else {
+          if (res.status === 404) updateConnectionStatus(false);
+          setStorageToken('');
+          authToken = '';
+        }
+      } catch (err) {
+        console.warn('Auto-login error:', err);
+        updateConnectionStatus(false);
+      }
+      return authToken;
+    }
+
+    async function fetchTasks() {
+      let token = await ensureAuth();
+      if (!token) return;
+
+      try {
+        let res = await fetch(getApiUrl('/api/v1/tasks?limit=100'), {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          if (token) {
+            res = await fetch(getApiUrl('/api/v1/tasks?limit=100'), {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+          }
+        }
+        if (!res.ok) {
+          if (res.status === 404) updateConnectionStatus(false);
+          return;
+        }
+
+        updateConnectionStatus(true);
+        const data = await res.json();
+        allTasks = data.tasks || [];
+        applyFiltersAndRender();
+        checkDuplicateInline();
+      } catch (err) {
+        console.error('Fetch error:', err);
+        updateConnectionStatus(false);
+      }
+    }
+
+    function checkDuplicateInline() {
+      const title = (document.getElementById('task-title').value || '').trim();
+      const type = document.getElementById('task-type').value;
+      const warnEl = document.getElementById('duplicate-warning');
+      const inputEl = document.getElementById('task-title');
+      const hintEl = document.getElementById('dup-status-hint');
+
+      if (!title) {
+        if (warnEl) warnEl.style.display = 'none';
+        if (inputEl) inputEl.style.borderColor = '';
+        if (hintEl) hintEl.innerText = 'Active deduplication enabled';
+        return;
+      }
+
+      // Check against allTasks for active tasks (QUEUED, PENDING, RUNNING) with identical title and task_type
+      const activeDup = allTasks.find(t =>
+        ['QUEUED', 'PENDING', 'RUNNING'].includes(t.status) &&
+        (t.title || '').trim().toLowerCase() === title.toLowerCase() &&
+        t.task_type === type
+      );
+
+      if (activeDup) {
+        if (warnEl) {
+          warnEl.innerText = `Duplicate Detected (${activeDup.status})`;
+          warnEl.style.display = 'inline';
+        }
+        if (inputEl) inputEl.style.borderColor = '#F59E0B';
+        if (hintEl) hintEl.innerText = `Warning: Active task "${title}" already exists in ${activeDup.status} state`;
+      } else {
+        if (warnEl) warnEl.style.display = 'none';
+        if (inputEl) inputEl.style.borderColor = '';
+        if (hintEl) hintEl.innerText = 'No active duplicate detected';
+      }
+    }
+
+    function toggleDispatcher() {
+      const panel = document.getElementById('dispatch-panel');
+      if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+      }
+      panel.scrollIntoView({ behavior: 'smooth' });
+      const input = document.getElementById('task-title');
+      if (input) input.focus();
+    }
+
+    function handleSearch(val) {
+      currentSearch = val.toLowerCase().trim();
+      applyFiltersAndRender();
+    }
+
+    function applyFilters() {
+      currentTypeFilter = document.getElementById('filter-type').value;
+      currentPriorityFilter = document.getElementById('filter-priority').value;
+      const dupSelect = document.getElementById('filter-duplicate');
+      currentDuplicateFilter = dupSelect ? dupSelect.value : '';
+      applyFiltersAndRender();
+    }
+
+    function setMobileView(tab, e) {
+      activeMobileTab = tab;
+      const pills = document.querySelectorAll('.tab-pill');
+      pills.forEach(p => p.classList.remove('active'));
+      const activePill = (e && e.target) ? e.target : document.querySelector(`.tab-pill[onclick*="'${tab}'"]`);
+      if (activePill) activePill.classList.add('active');
+
+      const colMap = {
+        QUEUED: document.getElementById('col-container-queued'),
+        RUNNING: document.getElementById('col-container-running'),
+        SUCCESS: document.getElementById('col-container-success'),
+        DEAD_LETTERED: document.getElementById('col-container-dlq'),
+      };
+
+      if (tab === 'ALL') {
+        Object.values(colMap).forEach(col => col.classList.remove('mobile-hidden'));
+      } else {
+        Object.entries(colMap).forEach(([k, col]) => {
+          if (k === tab) col.classList.remove('mobile-hidden');
+          else col.classList.add('mobile-hidden');
+        });
+      }
+    }
+
+    function applyFiltersAndRender() {
+      const sigCounts = {};
+      allTasks.forEach(task => {
+        const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+        sigCounts[sig] = (sigCounts[sig] || 0) + 1;
+      });
+
+      const filtered = allTasks.filter(task => {
+        if (currentTypeFilter && task.task_type !== currentTypeFilter) return false;
+        if (currentPriorityFilter && String(task.priority) !== currentPriorityFilter) return false;
+        if (currentDuplicateFilter === 'duplicates') {
+          const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+          if ((sigCounts[sig] || 0) <= 1) return false;
+        }
+        if (currentSearch) {
+          const matchTitle = (task.title || '').toLowerCase().includes(currentSearch);
+          const matchId = (task.id || '').toLowerCase().includes(currentSearch);
+          const matchTrace = (task.trace_id || '').toLowerCase().includes(currentSearch);
+          if (!matchTitle && !matchId && !matchTrace) return false;
+        }
+        return true;
+      });
+
+      renderColumns(filtered, sigCounts);
+    }
+
+    function renderColumns(tasks, sigCounts = {}) {
+      const cols = {
+        QUEUED: document.getElementById('col-queued'),
+        RUNNING: document.getElementById('col-running'),
+        SUCCESS: document.getElementById('col-success'),
+        DEAD_LETTERED: document.getElementById('col-dlq'),
+      };
+
+      Object.values(cols).forEach(col => col.innerHTML = '');
+
+      let counts = { total: tasks.length, queued: 0, running: 0, success: 0, dlq: 0 };
+
+      tasks.forEach(task => {
+        const status = task.status;
+        if (status === 'QUEUED' || status === 'PENDING') counts.queued++;
+        else if (status === 'RUNNING') counts.running++;
+        else if (status === 'SUCCESS') counts.success++;
+        else counts.dlq++;
+
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.onclick = (e) => {
+          if (e.target.tagName === 'BUTTON') return;
+          openTaskModal(task.id);
+        };
+
+        let progressHtml = '';
+        if (status === 'RUNNING') {
+          progressHtml = `
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${Math.max(task.progress || 25, 20)}%;"></div>
+            </div>
+            <div style="font-size:0.72rem; color:#38BDF8; font-weight:600;">Executing: ${task.progress || 25}%</div>
+          `;
+        }
+
+        let delayBadge = '';
+        if (task.delay_seconds && task.delay_seconds > 0) {
+          delayBadge = `<span class="tag tag-delay">Delay: ${task.delay_seconds}s</span>`;
+        }
+        let webhookBadge = '';
+        if (task.webhook_url) {
+          webhookBadge = `<span class="tag tag-wh" title="${task.webhook_url}">Webhook</span>`;
+        }
+
+        const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+        const isDup = (sigCounts[sig] || 0) > 1;
+        let dupBadge = '';
+        if (isDup) {
+          dupBadge = `<span class="tag" style="background:rgba(245,158,11,0.15); color:#F59E0B; border:1px solid rgba(245,158,11,0.3);" title="Duplicate task: ${sigCounts[sig]} instances detected">Duplicate (${sigCounts[sig]})</span>`;
+        }
+
+        let actionHtml = `
+          <div class="card-actions">
+            <button onclick="openTaskModal('${task.id}')" class="btn btn-secondary btn-xs">Inspect</button>
+        `;
+        if (status === 'QUEUED' || status === 'RUNNING' || status === 'PENDING') {
+          actionHtml += `<button onclick="cancelTask('${task.id}')" class="btn btn-danger btn-xs">Cancel</button>`;
+        } else if (status === 'FAILED' || status === 'DEAD_LETTERED') {
+          actionHtml += `<button onclick="retryTask('${task.id}')" class="btn btn-success btn-xs">Retry</button>`;
+        }
+        actionHtml += `</div>`;
+
+        let snippet = '';
+        if (task.error_message) {
+          snippet = `<div style="font-size:0.7rem; color:#F87171; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${task.error_message}</div>`;
+        } else if (task.result) {
+          snippet = `<div style="font-size:0.7rem; color:#34D399; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Output: ${JSON.stringify(task.result)}</div>`;
+        }
+
+        card.innerHTML = `
+          <div class="task-title">${task.title}</div>
+          <div class="task-meta">
+            <span class="tag tag-prio">Prio ${task.priority}</span>
+            <span class="tag">${task.task_type}</span>
+            <span class="tag">Att: ${task.current_attempt}/${task.max_retries}</span>
+            ${delayBadge}
+            ${webhookBadge}
+            ${dupBadge}
+          </div>
+          ${progressHtml}
+          ${snippet}
+          ${actionHtml}
+        `;
+
+        if (status === 'QUEUED' || status === 'PENDING') cols.QUEUED.appendChild(card);
+        else if (status === 'RUNNING') cols.RUNNING.appendChild(card);
+        else if (status === 'SUCCESS') cols.SUCCESS.appendChild(card);
+        else cols.DEAD_LETTERED.appendChild(card);
+      });
+
+      if (counts.queued === 0) cols.QUEUED.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">No queued tasks</div>';
+      if (counts.running === 0) cols.RUNNING.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">No running tasks</div>';
+      if (counts.success === 0) cols.SUCCESS.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">No completed tasks</div>';
+      if (counts.dlq === 0) cols.DEAD_LETTERED.innerHTML = '<div style="color:#64748B; font-size:0.75rem; text-align:center; margin-top:24px; padding:12px; border:1px dashed #1E293B; border-radius:6px;">DLQ is empty</div>';
+
+      // Update counters
+      document.getElementById('total-count').innerText = counts.total;
+      document.getElementById('queued-count').innerText = counts.queued;
+      document.getElementById('running-count').innerText = counts.running;
+      document.getElementById('success-count').innerText = counts.success;
+      document.getElementById('dlq-count').innerText = counts.dlq;
+
+      const startCountEl = document.getElementById('start-count');
+      if (startCountEl) startCountEl.innerText = counts.queued;
+
+      document.getElementById('badge-queued').innerText = counts.queued;
+      document.getElementById('badge-running').innerText = counts.running;
+      document.getElementById('badge-success').innerText = counts.success;
+      document.getElementById('badge-dlq').innerText = counts.dlq;
+
+      document.getElementById('m-all').innerText = counts.total;
+      document.getElementById('m-queued').innerText = counts.queued;
+      document.getElementById('m-running').innerText = counts.running;
+      document.getElementById('m-success').innerText = counts.success;
+      document.getElementById('m-dlq').innerText = counts.dlq;
+
+      document.getElementById('filter-count-badge').innerText = `Showing ${tasks.length} of ${allTasks.length} tasks`;
+    }
+
+    // Modal Inspection Logic
+    function openTaskModal(taskId) {
+      const task = allTasks.find(t => t.id === taskId);
+      if (!task) return;
+      currentModalTaskId = taskId;
+
+      document.getElementById('modal-title').innerText = task.title;
+      document.getElementById('modal-task-id').innerText = task.id;
+      document.getElementById('modal-trace-id').innerText = task.trace_id || 'N/A';
+      document.getElementById('modal-type-prio').innerText = `${task.task_type} (Priority: ${task.priority})`;
+      document.getElementById('modal-delay-webhook').innerText = `Delay: ${task.delay_seconds || 0}s | Webhook: ${task.webhook_url ? 'Configured' : 'None'}`;
+      document.getElementById('modal-created').innerText = new Date(task.created_at).toLocaleString();
+      document.getElementById('modal-updated').innerText = new Date(task.updated_at).toLocaleString();
+
+      const dupStatusEl = document.getElementById('modal-dup-status');
+      if (dupStatusEl) {
+        const sig = `${task.task_type}::${(task.title || '').trim().toLowerCase()}`;
+        const dupList = allTasks.filter(t => `${t.task_type}::${(t.title || '').trim().toLowerCase()}` === sig);
+        if (dupList.length > 1) {
+          dupStatusEl.innerHTML = `<span style="color:#F59E0B; font-weight:600;">Duplicate Detected (${dupList.length} instances in system)</span>`;
+        } else {
+          dupStatusEl.innerHTML = `<span style="color:#34D399;">Unique (No duplicates detected)</span>`;
+        }
+      }
+
+      const badge = document.getElementById('modal-status-badge');
+      badge.innerText = task.status;
+      if (task.status === 'SUCCESS') badge.className = 'tag tag-wh';
+      else if (task.status === 'RUNNING') badge.className = 'tag';
+      else if (task.status === 'DEAD_LETTERED' || task.status === 'FAILED') badge.className = 'tag tag-prio';
+      else badge.className = 'tag';
+
+      document.getElementById('modal-payload').innerText = JSON.stringify(task.payload || {}, null, 2);
+
+      const resultBox = document.getElementById('modal-result');
+      if (task.error_message) {
+        resultBox.style.color = '#F87171';
+        resultBox.innerText = `Error: ${task.error_message}`;
+      } else if (task.result) {
+        resultBox.style.color = '#34D399';
+        resultBox.innerText = JSON.stringify(task.result, null, 2);
+      } else {
+        resultBox.style.color = '#94A3B8';
+        resultBox.innerText = 'No result output recorded yet.';
+      }
+
+      // Render attempts table
+      const tbody = document.getElementById('modal-attempts-body');
+      tbody.innerHTML = '';
+      if (task.attempts && task.attempts.length > 0) {
+        task.attempts.forEach(att => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><strong>#${att.attempt_number}</strong></td>
+            <td><code>${att.worker_id}</code></td>
+            <td>${att.duration_ms ? att.duration_ms + 'ms' : '-'}</td>
+            <td><span class="tag">${att.status}</span></td>
+            <td>${new Date(att.started_at).toLocaleTimeString()}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:#94A3B8; text-align:center;">No worker attempts recorded yet</td></tr>';
+      }
+
+      // Modal action buttons
+      const actionContainer = document.getElementById('modal-actions');
+      actionContainer.innerHTML = '';
+      if (task.status === 'QUEUED' || task.status === 'RUNNING' || task.status === 'PENDING') {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-danger';
+        cancelBtn.innerText = 'Cancel Task';
+        cancelBtn.onclick = () => { cancelTask(task.id); closeTaskModal(); };
+        actionContainer.appendChild(cancelBtn);
+      } else if (task.status === 'FAILED' || task.status === 'DEAD_LETTERED') {
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'btn btn-success';
+        retryBtn.innerText = 'Retry Task';
+        retryBtn.onclick = () => { retryTask(task.id); closeTaskModal(); };
+        actionContainer.appendChild(retryBtn);
+      }
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'btn btn-secondary';
+      closeBtn.innerText = 'Close';
+      closeBtn.onclick = closeTaskModal;
+      actionContainer.appendChild(closeBtn);
+
+      document.getElementById('task-modal').style.display = 'flex';
+    }
+
+    function closeTaskModal() {
+      document.getElementById('task-modal').style.display = 'none';
+      currentModalTaskId = null;
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target.id === 'task-modal') closeTaskModal();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeTaskModal();
+    });
+
+    function copyModalField(elementId, btn) {
+      const text = document.getElementById(elementId).innerText;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+        btn.innerText = 'Copied';
+        setTimeout(() => btn.innerText = 'Copy', 1500);
+      }
+    }
+
+    async function handleDispatch(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const fb = document.getElementById('dispatch-feedback');
+      btn.disabled = true;
+      btn.innerText = 'Dispatching...';
+      if (fb) {
+        fb.style.display = 'block';
+        fb.style.background = 'rgba(59, 130, 246, 0.12)';
+        fb.style.border = '1px solid rgba(59, 130, 246, 0.35)';
+        fb.style.color = '#93C5FD';
+        fb.innerHTML = '<strong>Submitting task to cluster...</strong>';
+      }
+
+      let token = await ensureAuth();
+      let title = (document.getElementById('task-title').value || '').trim();
+      if (!title) {
+        title = 'Quick Task #' + Date.now().toString().slice(-4);
+      }
+      const task_type = document.getElementById('task-type').value;
+      const priority = parseInt(document.getElementById('task-priority').value, 10);
+      const delay = parseInt(document.getElementById('task-delay').value, 10) || 0;
+      const webhook = (document.getElementById('task-webhook').value || '').trim() || null;
+      const dedupCheckbox = document.getElementById('task-dedup');
+      const preventDuplicates = dedupCheckbox ? dedupCheckbox.checked : true;
+
+      try {
+        const payloadBody = {
+          title: title,
+          task_type: task_type,
+          priority: priority,
+          delay_seconds: delay,
+          prevent_duplicates: preventDuplicates,
+          payload: { timestamp: Date.now() }
+        };
+        if (webhook) payloadBody.webhook_url = webhook;
+
+        let res = await fetch(getApiUrl('/api/v1/tasks'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payloadBody)
+        });
+
+        // Token expired check
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch(getApiUrl('/api/v1/tasks'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payloadBody)
+          });
+        }
+
+        if (res.ok) {
+          const createdTask = await res.json().catch(() => null);
+          document.getElementById('task-title').value = '';
+          document.getElementById('task-webhook').value = '';
+          document.getElementById('task-delay').value = '0';
+          checkDuplicateInline();
+          btn.innerText = 'Enqueued';
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerText = 'Enqueue Task';
+          }, 1500);
+
+          if (createdTask) {
+            allTasks.unshift(createdTask);
+            applyFiltersAndRender();
+
+            if (fb) {
+              fb.style.display = 'block';
+              fb.style.background = 'rgba(16, 185, 129, 0.12)';
+              fb.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+              fb.style.color = '#34D399';
+              fb.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                  <div>
+                    <div style="font-weight:700; font-size:0.95rem; color:#FFFFFF; margin-bottom:4px;">
+                      Task Accepted by Cluster (Status: <span id="fb-status-${createdTask.id}">${createdTask.status}</span>)
+                    </div>
+                    <div style="color:#A7F3D0; font-size:0.85rem; margin-bottom:4px;">
+                      <strong>${createdTask.title}</strong> [${createdTask.task_type}] &bull; Priority P${createdTask.priority}
+                    </div>
+                    <div style="font-family:monospace; font-size:0.75rem; color:#94A3B8;">
+                      Task ID: ${createdTask.id} &bull; Trace: ${createdTask.trace_id || 'N/A'}
+                    </div>
+                    <div id="fb-result-${createdTask.id}" style="margin-top:6px; font-size:0.8rem; color:#38BDF8; font-family:monospace;">
+                      Waiting for worker pickup...
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:8px; align-self:flex-start;">
+                    <button type="button" class="btn btn-xs btn-primary" onclick="openTaskModal('${createdTask.id}')">Inspect</button>
+                    <button type="button" class="btn btn-xs btn-success" onclick="startPriorityProcessing()" style="background:#10B981;">Process Queue</button>
+                  </div>
+                </div>
+              `;
+              fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+              // Poll for live task execution outcome and display returned result
+              pollTaskResult(createdTask.id);
+            }
+          }
+          fetchTasks();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          let errMsg = '';
+          if (res.status === 409) {
+            errMsg = 'Duplicate Task Blocked (409 Conflict): ' + (errData.detail || 'A matching active task already exists in the queue.') + '<br><small style="color:#CBD5E1;">Tip: Uncheck "Duplicate Detection Guard" below if you want to allow duplicate tasks.</small>';
+          } else if (res.status === 404) {
+            errMsg = 'Endpoint Not Found (404): Backend task service is not running on this port. If viewing via <code>python -m http.server</code>, run <code>./run_local.sh</code> to start the FastAPI engine.';
+          } else {
+            errMsg = 'Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.');
+          }
+          if (fb) {
+            fb.style.display = 'block';
+            fb.style.background = 'rgba(239, 68, 68, 0.15)';
+            fb.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            fb.style.color = '#FCA5A5';
+            fb.innerHTML = `<strong>Error:</strong> ${errMsg}`;
+            fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else {
+            alert(errMsg.replace(/<[^>]*>/g, ''));
+          }
+          btn.disabled = false;
+          btn.innerText = 'Enqueue Task';
+        }
+      } catch (err) {
+        const fbErr = document.getElementById('dispatch-feedback');
+        if (fbErr) {
+          fbErr.style.display = 'block';
+          fbErr.style.background = 'rgba(239, 68, 68, 0.15)';
+          fbErr.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+          fbErr.style.color = '#FCA5A5';
+          fbErr.innerHTML = `<strong>Dispatch Error:</strong> ${err.message}. If running locally, please start the engine using <code>./run_local.sh</code> or <code>make run</code> instead of a static file server.`;
+          fbErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          alert('Dispatch error: ' + err.message);
+        }
+        btn.disabled = false;
+        btn.innerText = 'Enqueue Task';
+      }
+    }
+
+    function pollTaskResult(taskId) {
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        await fetchTasks();
+        const t = allTasks.find(x => x.id === taskId);
+        if (t) {
+          const statusEl = document.getElementById(`fb-status-${taskId}`);
+          const resEl = document.getElementById(`fb-result-${taskId}`);
+          if (statusEl) statusEl.innerText = t.status;
+          if (t.status === 'SUCCESS') {
+            if (resEl) {
+              resEl.style.color = '#34D399';
+              resEl.innerHTML = `<strong>Result Returned:</strong> <code>${JSON.stringify(t.result || { status: 'SUCCESS' })}</code>`;
+            }
+            clearInterval(interval);
+          } else if (t.status === 'FAILED' || t.status === 'DEAD_LETTERED') {
+            if (resEl) {
+              resEl.style.color = '#F87171';
+              resEl.innerHTML = `<strong>Execution Failed:</strong> ${t.error_message || 'Task failed'}`;
+            }
+            clearInterval(interval);
+          } else if (t.status === 'RUNNING') {
+            if (resEl) {
+              resEl.style.color = '#38BDF8';
+              resEl.innerHTML = `Worker executing task (${t.progress || 25}%)...`;
+            }
+          }
+        }
+        if (attempts >= 25) clearInterval(interval);
+      }, 350);
+    }
+
+    async function replayAllDLQ() {
+      const btn = document.getElementById('replay-all-btn');
+      const originalText = btn ? btn.innerText : 'Replay All';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Replaying...';
+      }
+      try {
+        let token = await ensureAuth();
+        let res = await fetch(getApiUrl('/api/v1/tasks/dlq/replay-all'), {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch(getApiUrl('/api/v1/tasks/dlq/replay-all'), {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          if (btn) btn.innerText = 'Replayed';
+          setTimeout(() => { if (btn) { btn.disabled = false; btn.innerText = originalText; } }, 1500);
+          fetchTasks();
+        } else {
+          alert(data.detail || data.message || 'DLQ Replay failed');
+          if (btn) { btn.disabled = false; btn.innerText = originalText; }
+        }
+      } catch (err) {
+        alert('DLQ Replay error: ' + err.message);
+        if (btn) { btn.disabled = false; btn.innerText = originalText; }
+      }
+    }
+    let lastExportedCsv = '';
+
+    async function exportTasksCsv() {
+      let token = await ensureAuth();
+      const btn = document.getElementById('export-btn');
+      const originalText = btn ? btn.innerText : 'Export CSV';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Exporting...';
+      }
+      let csvContent = '';
+      let taskCount = 0;
+
+      try {
+        let res = await fetch(getApiUrl('/api/v1/tasks/export?format=csv'), {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch(getApiUrl('/api/v1/tasks/export?format=csv'), {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        }
+        if (res.ok) {
+          csvContent = await res.text();
+          const lines = csvContent.trim().split('\n').filter(l => l.trim().length > 0);
+          taskCount = Math.max(0, lines.length - 1);
+        } else {
+          const clientData = buildClientSideCsv();
+          csvContent = clientData.content;
+          taskCount = clientData.count;
+        }
+      } catch (err) {
+        console.warn('Backend export fallback:', err);
+        const clientData = buildClientSideCsv();
+        csvContent = clientData.content;
+        taskCount = clientData.count;
+      }
+
+      if (!csvContent || csvContent.trim().length === 0) {
+        const clientData = buildClientSideCsv();
+        csvContent = clientData.content;
+        taskCount = clientData.count;
+      }
+
+      lastExportedCsv = csvContent;
+      if (btn) {
+        btn.innerText = `Exported (${taskCount})`;
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerText = originalText;
+        }, 2000);
+      }
+
+      // 1. Display CSV data in modal preview immediately
+      showCsvExportModal(csvContent, taskCount);
+
+      // 2. Trigger browser file download
+      triggerCsvDownload();
+    }
+
+    function buildClientSideCsv() {
+      const headers = ["task_id", "title", "task_type", "status", "priority", "current_attempt", "max_retries", "trace_id", "delay_seconds", "created_at"];
+      const rows = (allTasks || []).map(t => [
+        t.id,
+        `"${(t.title || '').replace(/"/g, '""')}"`,
+        t.task_type || '',
+        t.status || '',
+        t.priority || 5,
+        t.current_attempt || 0,
+        t.max_retries || 4,
+        t.trace_id || '',
+        t.delay_seconds || 0,
+        t.created_at || ''
+      ]);
+      const content = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      return { content: content, count: (allTasks || []).length };
+    }
+
+    function triggerCsvDownload() {
+      if (!lastExportedCsv) return;
+      try {
+        const filename = `cloudtask_audit_${Date.now()}.csv`;
+        const blob = new Blob([lastExportedCsv], { type: 'text/csv;charset=utf-8;' });
+        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+          window.navigator.msSaveOrOpenBlob(blob, filename);
+          return;
+        }
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.setAttribute('download', filename);
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          } catch (e) {}
+        }, 300);
+      } catch (e) {
+        console.warn('Direct file download fallback:', e);
+        try {
+          const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lastExportedCsv);
+          const link = document.createElement('a');
+          link.setAttribute('href', encodedUri);
+          link.setAttribute('download', `cloudtask_audit_${Date.now()}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          setTimeout(() => { try { document.body.removeChild(link); } catch (e) {} }, 300);
+        } catch (e2) {
+          console.warn('Data URI download fallback:', e2);
+        }
+      }
+    }
+
+    function showCsvExportModal(csvText, count) {
+      const modal = document.getElementById('csv-export-modal');
+      const preview = document.getElementById('csv-export-preview');
+      const countEl = document.getElementById('csv-export-count');
+      if (countEl) countEl.innerText = count !== undefined ? count : (csvText ? Math.max(0, csvText.trim().split('\n').length - 1) : 0);
+      if (preview) preview.innerText = csvText || '(No tasks recorded)';
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeCsvExportModal() {
+      const modal = document.getElementById('csv-export-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function handleCsvBackdropClick(e) {
+      if (e.target.id === 'csv-export-modal') closeCsvExportModal();
+    }
+
+    function copyCsvPreview(btn) {
+      if (lastExportedCsv && navigator.clipboard) {
+        navigator.clipboard.writeText(lastExportedCsv);
+        btn.innerText = 'Copied';
+        setTimeout(() => btn.innerText = 'Copy to Clipboard', 1500);
+      }
+    }
+
+    async function cancelTask(taskId) {
+      let token = await ensureAuth();
+      let res = await fetch(getApiUrl(`/api/v1/tasks/${taskId}/cancel`), {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        token = await ensureAuth(true);
+        await fetch(getApiUrl(`/api/v1/tasks/${taskId}/cancel`), {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      fetchTasks();
+    }
+
+    async function retryTask(taskId) {
+      let token = await ensureAuth();
+      let res = await fetch(getApiUrl(`/api/v1/tasks/${taskId}/retry`), {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        token = await ensureAuth(true);
+        await fetch(getApiUrl(`/api/v1/tasks/${taskId}/retry`), {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      fetchTasks();
+    }
+
+    let currentExecutionMode = 'auto';
+    let isProcessingQueue = false;
+
+    async function fetchExecutionMode() {
+      try {
+        let res = await fetch(getApiUrl('/api/v1/tasks/execution-mode'));
+        if (res.ok) {
+          const data = await res.json();
+          currentExecutionMode = data.mode || 'auto';
+          updateModeUI();
+        }
+      } catch (err) {
+        console.warn('Execution mode check:', err);
+      }
+    }
+
+    function updateModeUI() {
+      const badge = document.getElementById('mode-badge');
+      const guidance = document.getElementById('mode-guidance-text');
+      const btn = document.getElementById('mode-toggle-btn');
+      if (currentExecutionMode === 'auto') {
+        if (badge) {
+          badge.innerText = 'Auto-Start';
+          badge.style.color = '#34D399';
+        }
+        if (btn) {
+          btn.style.borderColor = '#10B981';
+          btn.style.color = '#6EE7B7';
+        }
+        if (guidance) {
+          guidance.innerHTML = '<strong>Auto-Start Mode:</strong> Tasks execute automatically in background as soon as they are submitted.';
+        }
+      } else {
+        if (badge) {
+          badge.innerText = 'Manual (Staged)';
+          badge.style.color = '#38BDF8';
+        }
+        if (btn) {
+          btn.style.borderColor = '#3B82F6';
+          btn.style.color = '#93C5FD';
+        }
+        if (guidance) {
+          guidance.innerHTML = '<strong>Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>Start Processing</strong> to execute in priority order (P10 to P1).';
+        }
+      }
+    }
+
+    async function toggleExecutionMode() {
+      const targetMode = currentExecutionMode === 'manual' ? 'auto' : 'manual';
+      const btn = document.getElementById('mode-toggle-btn');
+      if (btn) btn.disabled = true;
+      try {
+        let res = await fetch(getApiUrl('/api/v1/tasks/execution-mode'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: targetMode })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentExecutionMode = data.mode || targetMode;
+          updateModeUI();
+        }
+      } catch (err) {
+        console.error('Toggle execution mode error:', err);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function clearHistory() {
+      const btn = document.getElementById('clear-history-btn');
+      const originalText = btn ? btn.innerText : 'Clear History';
+      const successCount = parseInt(document.getElementById('success-count').innerText || '0');
+      if (successCount === 0) {
+        alert('No completed tasks in history to clear.');
+        return;
+      }
+      if (!confirm(`Are you sure you want to clear ${successCount} completed tasks from history?`)) {
+        return;
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Clearing...';
+      }
+      try {
+        let token = await ensureAuth();
+        let res = await fetch(getApiUrl('/api/v1/tasks/clear-history'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch(getApiUrl('/api/v1/tasks/clear-history'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        }
+        if (res.ok) {
+          if (btn) btn.innerText = 'Cleared';
+          await fetchTasks();
+          setTimeout(() => {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerText = originalText;
+            }
+          }, 1500);
+        } else {
+          alert('Failed to clear history.');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = originalText;
+          }
+        }
+      } catch (err) {
+        console.error('Clear history error:', err);
+        alert('Error clearing history: ' + err.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = originalText;
+        }
+      }
+    }
+
+    async function startPriorityProcessing() {
+      if (isProcessingQueue) return;
+
+      const btn = document.getElementById('start-btn');
+      const colBtn = document.getElementById('col-start-btn');
+      const queuedCount = parseInt(document.getElementById('queued-count').innerText || '0');
+
+      if (queuedCount === 0) {
+        alert('No tasks are currently queued! Enqueue 2 or 3 tasks with different priorities first (e.g. Priority 2, Priority 10), then tap Start Processing to watch priority scheduling in action.');
+        return;
+      }
+
+      isProcessingQueue = true;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Processing (P10 to P1)...';
+        btn.style.background = '#F59E0B';
+      }
+      if (colBtn) {
+        colBtn.disabled = true;
+        colBtn.innerText = 'Processing...';
+      }
+
+      try {
+        await fetch(getApiUrl('/api/v1/tasks/start-processing'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Fast rapid polling at 350ms to visibly capture and animate transitions: QUEUED -> RUNNING -> SUCCESS
+        let polls = 0;
+        const maxPolls = 70; // 70 * 350ms = ~24.5s max
+        const fastPoll = setInterval(async () => {
+          await fetchTasks();
+          polls++;
+          const remainingQueued = parseInt(document.getElementById('queued-count').innerText || '0');
+          const runningCount = parseInt(document.getElementById('running-count').innerText || '0');
+          if ((remainingQueued === 0 && runningCount === 0) || polls >= maxPolls) {
+            clearInterval(fastPoll);
+            isProcessingQueue = false;
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = 'Start Processing (<span id="start-count">' + remainingQueued + '</span>)';
+              btn.style.background = '#10B981';
+            }
+            if (colBtn) {
+              colBtn.disabled = false;
+              colBtn.innerText = 'Process Queue';
+            }
+          }
+        }, 350);
+      } catch (err) {
+        console.error('Failed to start processing:', err);
+        isProcessingQueue = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = 'Start Processing (<span id="start-count">' + queuedCount + '</span>)';
+          btn.style.background = '#10B981';
+        }
+        if (colBtn) {
+          colBtn.disabled = false;
+          colBtn.innerText = 'Process Queue';
+        }
+      }
+    }
+
+    // Initial fetch and 2.5-second live polling loop
+    fetchExecutionMode();
+    fetchTasks();
+    setInterval(fetchTasks, 2500);
+  </script>
 </body>
 </html>
