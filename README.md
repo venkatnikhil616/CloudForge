@@ -21,7 +21,7 @@ CloudTask is deployed live on Render with automated database migrations and zero
 
 | Service / Interface | Public URL | Description |
 | :--- | :--- | :--- |
-| **🚀 Operations Dashboard** | [cloudtask-platform.onrender.com/dashboard](https://cloudtask-platform.onrender.com/dashboard) | Real-time monitoring, task dispatch, DLQ redrive & CSV export |
+| **🚀 Operations Dashboard** | [cloudtask-platform.onrender.com/dashboard](https://cloudtask-platform.onrender.com/dashboard) | Real-time monitoring, task modals, execution modes, DLQ redrive & CSV audit export |
 | **📖 Interactive API Docs** | [cloudtask-platform.onrender.com/docs](https://cloudtask-platform.onrender.com/docs) | Interactive Swagger OpenAPI documentation & test console |
 | **❤️ Health Probe (Liveness)** | [cloudtask-platform.onrender.com/health/live](https://cloudtask-platform.onrender.com/health/live) | Gateway & downstream microservice health status |
 | **🔍 Health Probe (Readiness)** | [cloudtask-platform.onrender.com/health/ready](https://cloudtask-platform.onrender.com/health/ready) | Deep DB & Redis connectivity verification |
@@ -35,36 +35,52 @@ For testing role-protected endpoints or dashboard administrative actions:
 
 ## 🖥️ Web Operations Dashboard Walkthrough
 
-The built-in Web Operations Dashboard (`/dashboard`) provides end-to-end task lifecycle management and real-time operational oversight:
+The built-in Web Operations Dashboard (`/dashboard`) provides end-to-end task lifecycle management, priority execution orchestration, and real-time operational oversight:
 
 1. **Live Metric Cards**:
-   - **Pending & Processing**: Instant visibility into queue depth and worker utilization.
-   - **Completed & DLQ**: Real-time counters of completed executions and failed tasks routed to the Dead Letter Queue.
-   - **Performance Stats**: Continuous calculation of average task execution latency and success rate percentages.
+   - **Pending & Processing**: Instant visibility into queue depth and active worker utilization.
+   - **Completed & DLQ**: Real-time counters of successfully completed jobs and failed tasks routed to the Dead-Letter Queue.
+   - **Performance Stats**: Continuous calculation of average task execution latency and platform success rate percentages.
 
-2. **Quick Task Dispatcher & Duplicate Guard**:
-   - Easily enqueue background jobs directly from the dashboard.
-   - **Real-Time Pre-Flight Duplicate Detection**: Dynamically alerts if a matching active task is already in the queue as the title is typed.
+2. **Dedicated New Task Modal Dialog**:
+   - Centered modal dialog (Linear/Jira-inspired) accessible directly via the top navigation bar **+ New Task** button.
+   - Dynamic contextual auto-naming suggestions, handler type selector (`email_dispatch`, `data_sync`, `report_generation`, `image_processing`), priority slider (1 Low to 10 Critical), execution delay configuration, JSON payload editor, and duplicate guard toggle.
+   - In-modal return execution streaming with real-time status feedback upon submission.
+
+3. **Execution Mode Switcher (`Auto-Start` vs `Manual Staged`)**:
+   - Top-level operational mode selector allowing instant toggling between execution strategies:
+     - **Auto-Start**: Tasks are immediately dispatched to RabbitMQ worker priority queues upon enqueueing.
+     - **Manual (Staged)**: Tasks accumulate safely in a staged queue (`QUEUED`), allowing operators to inspect batches and trigger deterministic, priority-ordered execution on demand.
+
+4. **1-Click Priority Demo Seeding**:
+   - When the active queue is empty, the dashboard provides a 1-click **Seed Demo Tasks** action that enqueues three multi-priority tasks (P10 Critical, P8 High, P5 Normal) to demonstrate priority scheduling order in real time.
+
+5. **Manual Batch Staging & Priority Execution ("Start Process")**:
+   - Operators can stage tasks and initiate sequential execution strictly ordered by priority (P10 down to P1) with paced worker processing to visualize scheduling mechanics.
+
+6. **Real-Time Pre-Flight Duplicate Detection & Duplicate Guard**:
+   - Dynamic debounced collision checking as task titles are typed in the dispatcher or modal.
    - **Duplicate Detection Guard Toggle**: Automatically rejects duplicate active tasks (`QUEUED`, `PENDING`, `RUNNING`) with HTTP 409 Conflict when enabled; toggleable to allow intentional duplicates.
-   - Configurable **Task Title**, **Handler Type**, **Priority (1-10)**, Delay Seconds, and Webhook Callback URL.
+   - **Visual Duplicate Tags**: Tasks with matching titles across the fleet display an amber `Duplicate (<count>)` badge on Kanban cards.
+   - **Duplicates-Only Filter**: Toolbar toggle to isolate colliding task submissions across states.
 
-3. **Manual Batch Staging & Priority Execution ("Start Process")**:
-   - Operators can enqueue multiple tasks in staged mode without immediate execution.
-   - Clicking **Start Process** initiates sequential execution strictly ordered by priority (P10 Critical down to P1 Low) with paced worker processing to ensure complete visibility.
+7. **Interactive Task Inspection Modal**:
+   - Comprehensive task inspection dialog (Flower/Temporal-inspired) opening upon clicking any task card.
+   - Displays complete JSON payload, attempt history, retry backoff intervals, worker node allocation, execution timing breakdowns, and detailed error tracebacks.
 
-4. **Visual Duplicate Tags & Duplicates-Only Filter**:
-   - Tasks with matching duplicates across the fleet display an amber `Duplicate (<count>)` badge on Kanban cards.
-   - The toolbar features an instant **Duplicates Only** filter alongside type and priority filters.
+8. **Enterprise Toast Notification & Action Center**:
+   - Non-blocking, real-time toast feedback for all operational events (task submissions, batch triggers, queue purging, DLQ redrives, export status).
 
-5. **Clear History Action**:
-   - One-click **Clear History** button instantly purges completed and failed tasks from the dashboard to maintain optimal UI responsiveness.
+9. **CSV Audit Export & Modal Preview**:
+   - Click **Export CSV** to open the audit export dialog with instant modal preview and direct file download.
+   - Features 1-click clipboard copy of raw CSV records and dual fallback (backend streaming + client-side memory dump).
 
-6. **One-Click CSV Audit Export**:
-   - Click **Export CSV** to immediately stream full operational task history with dual fallback (backend streaming + client-side data fallback).
+10. **Dead-Letter Queue (DLQ) & 1-Click Replay**:
+    - Inspect poisoned or failed tasks with detailed failure reasons and retry attempt counters.
+    - Click **Replay All** to redrive failed tasks back into worker priority queues with exponential backoff reset.
 
-7. **Dead-Letter Queue (DLQ) & 1-Click Replay**:
-   - Inspect failed tasks with full failure reasons and execution attempt counters.
-   - Click **Replay All** to redrive all failed tasks back into worker priority queues with exponential backoff reset.
+11. **Clear History Action**:
+    - One-click **Clear History** button purges completed and failed tasks from the dashboard to maintain optimal UI responsiveness.
 
 ---
 
@@ -120,10 +136,13 @@ The built-in Web Operations Dashboard (`/dashboard`) provides end-to-end task li
 - 🔒 **Stateless JWT Authentication**: Secure password hashing with bcrypt, JWT token issuing, verification, and role-based access control.
 - 🛡️ **Active Duplicate Task Detection**: Active collision detection rejecting duplicate active submissions (`QUEUED`, `PENDING`, `RUNNING`) with `HTTP 409 Conflict`, pre-flight checking (`POST /api/v1/tasks/check-duplicate`), and cluster scanner (`GET /api/v1/tasks/duplicates`).
 - ⚡ **Priority-Based Task Queuing & Batch Staging**: 10 levels of task priority (1 Low to 10 Critical) dispatched via RabbitMQ, with manual batch staging and sequential priority execution ("Start Process").
+- 🎛️ **Dual Execution Modes**: Dynamic switching between automatic immediate worker dispatch (`auto`) and operator-controlled batch staging (`manual`).
+- 🔍 **Interactive Task Inspector & Creation Modals**: Deep inspection modals (Flower/Temporal style) displaying payloads, retry counts, latency breakdowns, and worker assignments, alongside Jira/Linear-style task creation modals.
 - 🛡️ **At-Least-Once Delivery & Idempotency**: Redis distributed mutex locking (`Redlock` pattern) combined with PostgreSQL unique constraints prevent duplicate execution.
 - 🔁 **Controlled Exponential Backoff & DLQ**: Configurable retry policies ($5 \times 3^{\text{attempt}}$ seconds) with automatic escalation to Dead Letter Queue (`cloudtask.tasks.dlq`).
 - ⏱️ **Distributed Scheduler**: Cron-based and interval job execution with Redis leader election to prevent duplicate task emission across replicas.
-- 📬 **Event-Driven Notifications**: Asynchronous event dispatching for task completions, failures, and system alerts.
+- 📬 **Event-Driven Notifications & Toast Alerts**: Asynchronous event dispatching for task completions, failures, and real-time dashboard action toasts.
+- 📋 **Audit Logging & CSV Export**: Comprehensive operational audit export with direct CSV download and modal preview with 1-click clipboard copy.
 - 🧹 **State Cleanup & Clear History**: Instant one-click purging of finished and dead-lettered tasks to maintain high UI responsiveness.
 - ☸️ **Cloud-Native Kubernetes & Helm**: Full declarative manifests, StatefulSets with PVCs, HPA autoscaling, NetworkPolicies, and Helm charts.
 - 🚀 **GitOps Deployment**: Declarative sync and automated deployments via Argo CD.
@@ -171,25 +190,38 @@ curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/check-dupli
   -d '{"title": "Batch Data Ingestion", "task_type": "data_sync"}' | jq .
 ```
 
-### 5. Trigger Staged Priority Execution
+### 5. Configure Execution Mode (Auto-Start vs Manual Staging)
+```bash
+# Switch execution mode to manual staged batching
+curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/execution-mode \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"mode": "manual"}' | jq .
+
+# Query current execution mode and staged backlog count
+curl -s -X GET https://cloudtask-platform.onrender.com/api/v1/tasks/execution-mode \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### 6. Trigger Staged Priority Execution
 ```bash
 curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/start-processing \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-### 6. Query Task Status
+### 7. Query Task Status
 ```bash
 curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/<TASK_ID>" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-### 7. Clear Finished History
+### 8. Clear Finished History
 ```bash
 curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/clear-history \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-### 8. Export Task Audit History to CSV
+### 9. Export Task Audit History to CSV
 ```bash
 curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/export?format=csv" \
   -H "Authorization: Bearer $TOKEN" -o tasks_audit_log.csv
@@ -197,7 +229,7 @@ curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/export?form
 head -n 5 tasks_audit_log.csv
 ```
 
-### 9. Replay Dead Letter Queue (DLQ)
+### 10. Replay Dead Letter Queue (DLQ)
 ```bash
 curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/dlq/replay-all \
   -H "Authorization: Bearer $TOKEN" | jq .
