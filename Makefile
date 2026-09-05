@@ -1,8 +1,10 @@
-.PHONY: help install lint test test-unit test-integration test-e2e docker-up docker-down docker-build k8s-apply k8s-delete clean
+.PHONY: help run dev install lint test test-unit test-integration test-e2e docker-up docker-down docker-build k8s-apply k8s-delete clean
 
 help:
 	@echo "CloudTask Development Makefile"
 	@echo "Available commands:"
+	@echo "  make run             Start full engine locally (API gateway, DB, workers)"
+	@echo "  make dev             Alias for make run"
 	@echo "  make install         Install python dependencies"
 	@echo "  make lint            Run ruff linter"
 	@echo "  make test            Run all tests with pytest"
@@ -14,6 +16,12 @@ help:
 	@echo "  make k8s-apply       Apply all Kubernetes manifests"
 	@echo "  make k8s-delete      Delete all Kubernetes resources"
 	@echo "  make clean           Clean cache and temporary files"
+
+run:
+	@bash run_local.sh
+
+dev:
+	@bash run_local.sh
 
 install:
 	pip install -r requirements.txt

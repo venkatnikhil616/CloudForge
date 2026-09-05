@@ -461,6 +461,11 @@ async def real_time_dashboard():
 </head>
 <body>
   <div class="container">
+    <!-- Server Offline / Static Server Notice -->
+    <div id="offline-alert" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#FCA5A5; font-size:0.85rem; line-height:1.5;">
+      <strong>Backend Offline / Static Server Notice:</strong> The dashboard cannot communicate with the FastAPI backend. If you are serving files using <code>python -m http.server</code>, API operations (task enqueueing, queue processing, CSV audit streaming) will not run. Please execute <code>./run_local.sh</code> or <code>make run</code> in your terminal to start the live engine with full API and worker support.
+    </div>
+
     <!-- Navbar -->
     <div class="nav">
       <div class="nav-brand">
@@ -592,6 +597,8 @@ async def real_time_dashboard():
           </div>
         </div>
       </form>
+      <!-- Inline Task Dispatch Feedback / Return Banner -->
+      <div id="dispatch-feedback" style="display:none; margin-top:14px; padding:12px 14px; border-radius:8px; font-size:0.85rem;"></div>
     </div>
 
     <!-- Mobile Segmented Tabs -->
@@ -737,6 +744,33 @@ async def real_time_dashboard():
     </div>
   </div>
 
+  <!-- CSV Export Preview Modal -->
+  <div class="modal-backdrop" id="csv-export-modal" onclick="handleCsvBackdropClick(event)">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Task Audit CSV Export</h3>
+        <button type="button" class="modal-close" onclick="closeCsvExportModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:0.85rem; color:#94A3B8; margin-bottom:6px;">
+          Export generated: <strong id="csv-export-count" style="color:#38BDF8;">0</strong> task records.
+        </div>
+        <div style="font-size:0.75rem; color:#64748B; margin-bottom:12px;">
+          Browser file download was initiated. If your browser blocks popups or file downloads, you can directly download or copy the CSV data below:
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-primary btn-xs" onclick="triggerCsvDownload()" id="modal-download-btn">Download CSV File</button>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="copyCsvPreview(this)" id="modal-copy-btn">Copy to Clipboard</button>
+        </div>
+        <div class="detail-label" style="margin-bottom: 4px;">CSV Output Stream</div>
+        <pre class="code-block" id="csv-export-preview" style="max-height: 240px; white-space: pre; overflow-x: auto; font-size: 0.76rem; color: #34D399;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeCsvExportModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let authToken = localStorage.getItem('cloudtask_token') || '';
     let allTasks = [];
@@ -746,6 +780,14 @@ async def real_time_dashboard():
     let currentDuplicateFilter = '';
     let activeMobileTab = 'ALL';
     let currentModalTaskId = null;
+
+    let isServerOnline = true;
+
+    function updateConnectionStatus(online) {
+      isServerOnline = online;
+      const alertEl = document.getElementById('offline-alert');
+      if (alertEl) alertEl.style.display = online ? 'none' : 'block';
+    }
 
     async function ensureAuth(forceRefresh = false) {
       if (authToken && !forceRefresh) return authToken;
@@ -759,13 +801,16 @@ async def real_time_dashboard():
           const data = await res.json();
           authToken = data.access_token;
           localStorage.setItem('cloudtask_token', authToken);
+          updateConnectionStatus(true);
           return authToken;
         } else {
+          if (res.status === 404) updateConnectionStatus(false);
           localStorage.removeItem('cloudtask_token');
           authToken = '';
         }
       } catch (err) {
         console.warn('Auto-login error:', err);
+        updateConnectionStatus(false);
       }
       return authToken;
     }
@@ -786,14 +831,19 @@ async def real_time_dashboard():
             });
           }
         }
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (res.status === 404) updateConnectionStatus(false);
+          return;
+        }
 
+        updateConnectionStatus(true);
         const data = await res.json();
         allTasks = data.tasks || [];
         applyFiltersAndRender();
         checkDuplicateInline();
       } catch (err) {
         console.error('Fetch error:', err);
+        updateConnectionStatus(false);
       }
     }
 
@@ -1140,8 +1190,10 @@ async def real_time_dashboard():
     async function handleDispatch(e) {
       e.preventDefault();
       const btn = document.getElementById('submit-btn');
+      const fb = document.getElementById('dispatch-feedback');
       btn.disabled = true;
       btn.innerText = 'Dispatching...';
+      if (fb) fb.style.display = 'none';
 
       let token = await ensureAuth();
       let title = document.getElementById('task-title').value.trim();
@@ -1189,6 +1241,7 @@ async def real_time_dashboard():
         }
 
         if (res.ok) {
+          const createdTask = await res.json().catch(() => null);
           document.getElementById('task-title').value = '';
           document.getElementById('task-webhook').value = '';
           document.getElementById('task-delay').value = '0';
@@ -1198,19 +1251,64 @@ async def real_time_dashboard():
             btn.disabled = false;
             btn.innerText = 'Enqueue Task';
           }, 1500);
+
+          if (createdTask) {
+            allTasks.unshift(createdTask);
+            applyFiltersAndRender();
+
+            if (fb) {
+              fb.style.display = 'block';
+              fb.style.background = 'rgba(16, 185, 129, 0.12)';
+              fb.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+              fb.style.color = '#34D399';
+              fb.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                  <div>
+                    <strong>Task Enqueued:</strong> "${createdTask.title}"<br>
+                    <span style="font-family:monospace; font-size:0.75rem; color:#94A3B8;">ID: ${createdTask.id} | Priority: P${createdTask.priority} | Status: ${createdTask.status} | Trace: ${createdTask.trace_id || 'N/A'}</span>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <button type="button" class="btn btn-xs btn-primary" onclick="openTaskModal('${createdTask.id}')">Inspect</button>
+                    <button type="button" class="btn btn-xs btn-success" onclick="startPriorityProcessing()" style="background:#10B981;">Process Queue</button>
+                  </div>
+                </div>
+              `;
+            }
+          }
           fetchTasks();
         } else {
           const errData = await res.json().catch(() => ({}));
+          let errMsg = '';
           if (res.status === 409) {
-            alert('Duplicate Task Blocked (409 Conflict):\n' + (errData.detail || 'A matching active task already exists in the queue.') + '\n\nTip: Uncheck "Duplicate Detection Guard" below if you want to allow duplicate tasks.');
+            errMsg = 'Duplicate Task Blocked (409 Conflict): ' + (errData.detail || 'A matching active task already exists in the queue.') + '<br><small style="color:#CBD5E1;">Tip: Uncheck "Duplicate Detection Guard" below if you want to allow duplicate tasks.</small>';
+          } else if (res.status === 404) {
+            errMsg = 'Endpoint Not Found (404): Backend task service is not running on this port. If viewing via <code>python -m http.server</code>, run <code>./run_local.sh</code> to start the FastAPI engine.';
           } else {
-            alert('Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.'));
+            errMsg = 'Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable. Please retry.');
+          }
+          if (fb) {
+            fb.style.display = 'block';
+            fb.style.background = 'rgba(239, 68, 68, 0.15)';
+            fb.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            fb.style.color = '#FCA5A5';
+            fb.innerHTML = `<strong>Error:</strong> ${errMsg}`;
+          } else {
+            alert(errMsg.replace(/<[^>]*>/g, ''));
           }
           btn.disabled = false;
           btn.innerText = 'Enqueue Task';
         }
       } catch (err) {
-        alert('Dispatch error: ' + err.message);
+        const fbErr = document.getElementById('dispatch-feedback');
+        if (fbErr) {
+          fbErr.style.display = 'block';
+          fbErr.style.background = 'rgba(239, 68, 68, 0.15)';
+          fbErr.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+          fbErr.style.color = '#FCA5A5';
+          fbErr.innerHTML = `<strong>Dispatch Error:</strong> ${err.message}. If running locally, please start the engine using <code>./run_local.sh</code> or <code>make run</code> instead of a static file server.`;
+        } else {
+          alert('Dispatch error: ' + err.message);
+        }
         btn.disabled = false;
         btn.innerText = 'Enqueue Task';
       }
@@ -1251,10 +1349,15 @@ async def real_time_dashboard():
       }
     }
 
+    let lastExportedCsv = '';
+
     async function exportTasksCsv() {
       let token = await ensureAuth();
       const btn = document.getElementById('export-btn');
       btn.innerText = 'Exporting...';
+      let csvContent = '';
+      let taskCount = 0;
+
       try {
         let res = await fetch('/api/v1/tasks/export?format=csv', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -1266,27 +1369,31 @@ async def real_time_dashboard():
           });
         }
         if (res.ok) {
-          const blob = await res.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `cloudtask_audit_${Date.now()}.csv`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          btn.innerText = 'Exported';
+          csvContent = await res.text();
+          taskCount = Math.max(0, csvContent.trim().split('\n').length - 1);
         } else {
-          exportClientSideCsv();
-          btn.innerText = 'Exported';
+          const clientData = buildClientSideCsv();
+          csvContent = clientData.content;
+          taskCount = clientData.count;
         }
       } catch (err) {
-        exportClientSideCsv();
-        btn.innerText = 'Exported';
+        const clientData = buildClientSideCsv();
+        csvContent = clientData.content;
+        taskCount = clientData.count;
       }
+
+      lastExportedCsv = csvContent;
+      btn.innerText = 'Exported';
       setTimeout(() => btn.innerText = 'Export CSV', 2000);
+
+      // Trigger browser file download
+      triggerCsvDownload();
+
+      // Display CSV data on screen in interactive preview modal
+      showCsvExportModal(csvContent, taskCount);
     }
 
-    function exportClientSideCsv() {
+    function buildClientSideCsv() {
       const headers = ["task_id", "title", "task_type", "status", "priority", "current_attempt", "max_retries", "trace_id", "delay_seconds", "created_at"];
       const rows = (allTasks || []).map(t => [
         t.id,
@@ -1300,15 +1407,50 @@ async def real_time_dashboard():
         t.delay_seconds || 0,
         t.created_at || ''
       ]);
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join(String.fromCharCode(10));
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cloudtask_audit_${Date.now()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const content = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      return { content: content, count: (allTasks || []).length };
+    }
+
+    function triggerCsvDownload() {
+      if (!lastExportedCsv) return;
+      try {
+        const blob = new Blob([lastExportedCsv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cloudtask_audit_${Date.now()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        console.warn('Direct file download error:', e);
+      }
+    }
+
+    function showCsvExportModal(csvText, count) {
+      const modal = document.getElementById('csv-export-modal');
+      const preview = document.getElementById('csv-export-preview');
+      const countEl = document.getElementById('csv-export-count');
+      if (countEl) countEl.innerText = count || (csvText ? Math.max(0, csvText.trim().split('\n').length - 1) : 0);
+      if (preview) preview.innerText = csvText || '(No tasks recorded)';
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeCsvExportModal() {
+      const modal = document.getElementById('csv-export-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function handleCsvBackdropClick(e) {
+      if (e.target.id === 'csv-export-modal') closeCsvExportModal();
+    }
+
+    function copyCsvPreview(btn) {
+      if (lastExportedCsv && navigator.clipboard) {
+        navigator.clipboard.writeText(lastExportedCsv);
+        btn.innerText = 'Copied';
+        setTimeout(() => btn.innerText = 'Copy to Clipboard', 1500);
+      }
     }
 
     async function cancelTask(taskId) {

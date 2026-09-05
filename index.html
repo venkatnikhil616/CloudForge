@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudTask Engine - Local Gateway</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <style>
+    :root {
+      --bg: #080C15;
+      --card-bg: #0F172A;
+      --card-border: #1E293B;
+      --primary: #2563EB;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 32px 16px; min-height: 100vh; line-height: 1.5; }
+    .container { max-width: 800px; margin: 0 auto; width: 100%; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .badge { display: inline-block; background: rgba(37,99,235,0.15); color: #60A5FA; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; margin-bottom: 10px; border: 1px solid rgba(37,99,235,0.3); }
+    h1 { font-size: 2rem; font-weight: 800; color: #FFFFFF; margin-bottom: 8px; }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 18px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 0.9rem; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-secondary { background: #1E293B; color: var(--text); border: 1px solid #334155; }
+    .btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+    .code-block { background: #050811; border: 1px solid var(--card-border); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 0.85rem; color: #A7F3D0; overflow-x: auto; margin-top: 10px; }
+    .notice { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 0.88rem; color: #FCD34D; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="badge">CloudTask Local Gateway</span>
+      <h1>CloudTask Platform Launcher</h1>
+      <p style="color:var(--text-muted); font-size:0.95rem;">Distributed Asynchronous Task Orchestration & Worker Engine</p>
+    </div>
+
+    <div class="notice">
+      <strong>Static Server Notice:</strong> If you are viewing this page through <code>python -m http.server</code>, the Python FastAPI backend and task workers are not running yet. Use the command below to start the live engine with full API support.
+    </div>
+
+    <div class="card">
+      <h3 style="color:#FFFFFF; margin-bottom:8px;">Start Full Engine Locally</h3>
+      <p style="color:var(--text-muted); font-size:0.88rem;">Run this single command in your CloudForge terminal to start the API gateway, SQLite database, and background worker loop:</p>
+      <pre class="code-block">./run_local.sh</pre>
+      <div style="font-size:0.8rem; color:#64748B; margin-top:6px;">Alternative: <code>python services/api-gateway/main.py</code> or <code>make run</code></div>
+    </div>
+
+    <div class="card">
+      <h3 style="color:#FFFFFF; margin-bottom:8px;">Access Live Environments</h3>
+      <p style="color:var(--text-muted); font-size:0.88rem;">Once running, or to use the cloud deployment, access the dashboard and API docs below:</p>
+      <div class="btn-group">
+        <a href="http://localhost:8000/dashboard" class="btn btn-primary">Local Dashboard (:8000)</a>
+        <a href="https://cloudtask-platform.onrender.com/dashboard" class="btn btn-success" target="_blank">Cloud Dashboard (Render)</a>
+        <a href="http://localhost:8000/docs" class="btn btn-secondary">API Docs (/docs)</a>
+        <a href="https://github.com/venkatnikhil616/CloudForge" class="btn btn-secondary" target="_blank">GitHub Repository</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

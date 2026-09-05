@@ -490,149 +490,6 @@ async def list_tasks(
     return TaskListResponse(total=total, page=page, limit=limit, tasks=list(tasks))
 
 
-@router.get("/{task_id}", response_model=TaskResponse)
-async def get_task(
-    task_id: str,
-    user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db_session)
-):
-    stmt = select(Task).options(selectinload(Task.attempts)).where(
-        Task.id == task_id,
-        Task.user_id == user_id
-    )
-    task = (await db.execute(stmt)).scalar_one_or_none()
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    return task
-
-
-@router.get("/{task_id}/stream")
-async def stream_task_progress(
-    task_id: str,
-    user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db_session)
-):
-    """Server-Sent Events (SSE) endpoint to stream real-time task progress."""
-    stmt = select(Task).where(Task.id == task_id, Task.user_id == user_id)
-    task = (await db.execute(stmt)).scalar_one_or_none()
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-
-    async def event_generator():
-        redis = get_redis_client()
-        pubsub = redis.pubsub()
-        channel_name = f"task:progress:{task_id}"
-        await pubsub.subscribe(channel_name)
-
-        try:
-            # Yield initial state
-            yield f"data: {json.dumps({'status': task.status.value, 'progress': task.progress, 'message': 'Subscribed to task stream'})}\n\n"
-
-            timeout = 180  # 3 minutes max streaming
-            start = asyncio.get_event_loop().time()
-
-            while (asyncio.get_event_loop().time() - start) < timeout:
-                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-                if message and message.get("data"):
-                    yield f"data: {message['data']}\n\n"
-                    data_obj = json.loads(message["data"])
-                    if data_obj.get("status") in ["SUCCESS", "FAILED", "DEAD_LETTERED", "CANCELLED"]:
-                        break
-                await asyncio.sleep(0.5)
-        finally:
-            await pubsub.unsubscribe(channel_name)
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-@router.post("/{task_id}/cancel", response_model=TaskResponse)
-async def cancel_task(
-    task_id: str,
-    user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db_session)
-):
-    stmt = select(Task).options(selectinload(Task.attempts)).where(
-        Task.id == task_id,
-        Task.user_id == user_id
-    )
-    task = (await db.execute(stmt)).scalar_one_or_none()
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-
-    if task.status in [TaskStatus.SUCCESS, TaskStatus.DEAD_LETTERED, TaskStatus.CANCELLED]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot cancel task in {task.status.value} state"
-        )
-
-    task.status = TaskStatus.CANCELLED
-    await db.commit()
-    await db.refresh(task)
-
-    # Worker Preemption: Broadcast abort signal via Redis pub/sub to interrupt running worker immediately
-    try:
-        redis = get_redis_client()
-        await redis.publish(f"task:abort:{task_id}", json.dumps({"action": "ABORT", "task_id": task_id}))
-    except Exception as e:
-        logger.warning(f"Failed to publish abort signal for task {task_id}: {e}")
-
-    logger.info(f"Task {task_id} cancelled by user, abort signal emitted.")
-    return task
-
-
-@router.post("/{task_id}/retry", response_model=TaskResponse)
-async def retry_task(
-    task_id: str,
-    user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db_session)
-):
-    stmt = select(Task).options(selectinload(Task.attempts)).where(
-        Task.id == task_id,
-        Task.user_id == user_id
-    )
-    task = (await db.execute(stmt)).scalar_one_or_none()
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-
-    if task.status not in [TaskStatus.FAILED, TaskStatus.DEAD_LETTERED]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only FAILED or DEAD_LETTERED tasks can be retried manually"
-        )
-
-    task.status = TaskStatus.QUEUED
-    task.error_message = None
-    task.progress = 0
-    await db.commit()
-
-    try:
-        mq_client = await get_rabbitmq_client()
-        task_message = {
-            "id": task.id,
-            "user_id": task.user_id,
-            "title": task.title,
-            "task_type": task.task_type,
-            "payload": task.payload,
-            "priority": task.priority,
-            "max_retries": task.max_retries,
-            "current_attempt": task.current_attempt,
-            "timeout_seconds": task.timeout_seconds,
-            "trace_id": task.trace_id,
-            "webhook_url": task.webhook_url,
-            "delay_seconds": task.delay_seconds,
-        }
-        await mq_client.publish_task(
-            task_payload=task_message,
-            priority=task.priority,
-            routing_key="task.created",
-        )
-    except Exception as e:
-        logger.warning(f"RabbitMQ publish deferred for retried task {task.id}: {e}")
-
-    logger.info(f"Task {task_id} manually re-queued for execution")
-    return task
-
-
 @router.get("/execution-mode")
 async def get_execution_mode_endpoint(db: AsyncSession = Depends(get_db_session)):
     """Returns current task processing mode ('manual' or 'auto') and queued count."""
@@ -799,5 +656,150 @@ async def get_duplicates_endpoint(
         "total_duplicate_tasks": sum(d["count"] for d in duplicates),
         "duplicates": duplicates,
     }
+
+
+
+
+@router.get("/{task_id}", response_model=TaskResponse)
+async def get_task(
+    task_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_session)
+):
+    stmt = select(Task).options(selectinload(Task.attempts)).where(
+        Task.id == task_id,
+        Task.user_id == user_id
+    )
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    return task
+
+
+@router.get("/{task_id}/stream")
+async def stream_task_progress(
+    task_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Server-Sent Events (SSE) endpoint to stream real-time task progress."""
+    stmt = select(Task).where(Task.id == task_id, Task.user_id == user_id)
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    async def event_generator():
+        redis = get_redis_client()
+        pubsub = redis.pubsub()
+        channel_name = f"task:progress:{task_id}"
+        await pubsub.subscribe(channel_name)
+
+        try:
+            # Yield initial state
+            yield f"data: {json.dumps({'status': task.status.value, 'progress': task.progress, 'message': 'Subscribed to task stream'})}\n\n"
+
+            timeout = 180  # 3 minutes max streaming
+            start = asyncio.get_event_loop().time()
+
+            while (asyncio.get_event_loop().time() - start) < timeout:
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if message and message.get("data"):
+                    yield f"data: {message['data']}\n\n"
+                    data_obj = json.loads(message["data"])
+                    if data_obj.get("status") in ["SUCCESS", "FAILED", "DEAD_LETTERED", "CANCELLED"]:
+                        break
+                await asyncio.sleep(0.5)
+        finally:
+            await pubsub.unsubscribe(channel_name)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.post("/{task_id}/cancel", response_model=TaskResponse)
+async def cancel_task(
+    task_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_session)
+):
+    stmt = select(Task).options(selectinload(Task.attempts)).where(
+        Task.id == task_id,
+        Task.user_id == user_id
+    )
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    if task.status in [TaskStatus.SUCCESS, TaskStatus.DEAD_LETTERED, TaskStatus.CANCELLED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel task in {task.status.value} state"
+        )
+
+    task.status = TaskStatus.CANCELLED
+    await db.commit()
+    await db.refresh(task)
+
+    # Worker Preemption: Broadcast abort signal via Redis pub/sub to interrupt running worker immediately
+    try:
+        redis = get_redis_client()
+        await redis.publish(f"task:abort:{task_id}", json.dumps({"action": "ABORT", "task_id": task_id}))
+    except Exception as e:
+        logger.warning(f"Failed to publish abort signal for task {task_id}: {e}")
+
+    logger.info(f"Task {task_id} cancelled by user, abort signal emitted.")
+    return task
+
+
+@router.post("/{task_id}/retry", response_model=TaskResponse)
+async def retry_task(
+    task_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_session)
+):
+    stmt = select(Task).options(selectinload(Task.attempts)).where(
+        Task.id == task_id,
+        Task.user_id == user_id
+    )
+    task = (await db.execute(stmt)).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    if task.status not in [TaskStatus.FAILED, TaskStatus.DEAD_LETTERED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only FAILED or DEAD_LETTERED tasks can be retried manually"
+        )
+
+    task.status = TaskStatus.QUEUED
+    task.error_message = None
+    task.progress = 0
+    await db.commit()
+
+    try:
+        mq_client = await get_rabbitmq_client()
+        task_message = {
+            "id": task.id,
+            "user_id": task.user_id,
+            "title": task.title,
+            "task_type": task.task_type,
+            "payload": task.payload,
+            "priority": task.priority,
+            "max_retries": task.max_retries,
+            "current_attempt": task.current_attempt,
+            "timeout_seconds": task.timeout_seconds,
+            "trace_id": task.trace_id,
+            "webhook_url": task.webhook_url,
+            "delay_seconds": task.delay_seconds,
+        }
+        await mq_client.publish_task(
+            task_payload=task_message,
+            priority=task.priority,
+            routing_key="task.created",
+        )
+    except Exception as e:
+        logger.warning(f"RabbitMQ publish deferred for retried task {task.id}: {e}")
+
+    logger.info(f"Task {task_id} manually re-queued for execution")
+    return task
 
 
