@@ -480,6 +480,70 @@
     </div>
   </div>
 
+  <!-- New Task Creation Modal Dialog (Jira/Linear inspired) -->
+  <div class="modal-backdrop" id="new-task-modal" onclick="handleNewTaskBackdropClick(event)">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="tag tag-wh">DISPATCH</span>
+          <h3>Dispatch New Task to Cluster</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="closeNewTaskModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="modal-task-form" onsubmit="handleModalDispatch(event); return false;">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="display:block; font-size:0.8rem; color:#94A3B8; margin-bottom:4px; font-weight:600;">Task Title</label>
+            <input type="text" id="modal-task-title" class="form-control" placeholder="e.g. Ingest Customer Ledger" style="width:100%;" />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div class="form-group">
+              <label style="display:block; font-size:0.8rem; color:#94A3B8; margin-bottom:4px; font-weight:600;">Handler Type</label>
+              <select id="modal-task-type" class="form-control" style="width:100%;">
+                <option value="report_generation">report_generation (PDF Export)</option>
+                <option value="data_processing">data_processing (ETL Batch)</option>
+                <option value="email_dispatch">email_dispatch (Transactional Email)</option>
+                <option value="system_cleanup">system_cleanup (Purge Temp Records)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label style="display:block; font-size:0.8rem; color:#94A3B8; margin-bottom:4px; font-weight:600;">Priority</label>
+              <select id="modal-task-priority" class="form-control" style="width:100%;">
+                <option value="10">10 - Critical Priority</option>
+                <option value="8" selected>8 - High Priority</option>
+                <option value="5">5 - Normal Priority</option>
+                <option value="1">1 - Low Priority</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div class="form-group">
+              <label style="display:block; font-size:0.8rem; color:#94A3B8; margin-bottom:4px; font-weight:600;">Delay Countdown (Seconds)</label>
+              <input type="number" id="modal-task-delay" class="form-control" value="0" min="0" max="86400" style="width:100%;" />
+            </div>
+            <div class="form-group">
+              <label style="display:block; font-size:0.8rem; color:#94A3B8; margin-bottom:4px; font-weight:600;">Webhook Callback URL</label>
+              <input type="text" id="modal-task-webhook" class="form-control" placeholder="https://api.example.com/webhook (Optional)" style="width:100%;" />
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+            <input type="checkbox" id="modal-task-dedup" style="cursor:pointer;" />
+            <label for="modal-task-dedup" style="font-size:0.8rem; color:#94A3B8; cursor:pointer; margin:0;">Duplicate Detection Guard (Reject duplicate active tasks)</label>
+          </div>
+          <button type="submit" class="btn btn-success" id="modal-submit-btn" style="width:100%; padding:10px; justify-content:center; font-weight:700;">
+            Enqueue Task to Cluster
+          </button>
+        </form>
+
+        <!-- Live Modal Dispatch Feedback / Return Panel -->
+        <div id="modal-dispatch-feedback" style="display:none; margin-top:14px; padding:12px 14px; border-radius:8px; font-size:0.85rem;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeNewTaskModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function getStorageToken() {
       try { return localStorage.getItem('cloudtask_token') || ''; } catch (e) { return ''; }
@@ -681,38 +745,233 @@
       }
     }
 
-    function toggleDispatcher() {
-      const panel = document.getElementById('dispatch-panel');
-      if (panel.style.display === 'none') {
-        panel.style.display = 'block';
-      }
+    function openNewTaskModal() {
+      const modal = document.getElementById('new-task-modal');
+      const titleInput = document.getElementById('modal-task-title');
       const sampleNum = Math.floor(1000 + Math.random() * 9000);
-      const titleInput = document.getElementById('task-title');
       const handlers = ['report_generation', 'data_processing', 'email_dispatch', 'system_cleanup'];
-      const typeSelect = document.getElementById('task-type');
-      const currentIdx = handlers.indexOf(typeSelect.value);
+      const typeSelect = document.getElementById('modal-task-type');
+      const currentIdx = handlers.indexOf(typeSelect ? typeSelect.value : '');
       const nextType = handlers[(currentIdx + 1) % handlers.length];
 
-      titleInput.value = 'Pipeline Task #' + sampleNum;
-      typeSelect.value = nextType;
+      if (titleInput) {
+        titleInput.value = 'Pipeline Task #' + sampleNum;
+      }
+      if (typeSelect) {
+        typeSelect.value = nextType;
+      }
 
-      const fb = document.getElementById('dispatch-feedback');
+      // Reset feedback and submit button in modal
+      const fb = document.getElementById('modal-dispatch-feedback');
       if (fb) fb.style.display = 'none';
 
-      panel.classList.remove('pulse-box-highlight');
-      void panel.offsetWidth;
-      panel.classList.add('pulse-box-highlight');
+      const submitBtn = document.getElementById('modal-submit-btn');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Enqueue Task to Cluster';
+      }
 
-      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      titleInput.focus();
-      titleInput.select();
+      // Pre-fill inline form as well
+      const inlineTitle = document.getElementById('task-title');
+      if (inlineTitle) inlineTitle.value = 'Pipeline Task #' + sampleNum;
+
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+      if (titleInput) {
+        setTimeout(() => { titleInput.focus(); titleInput.select(); }, 60);
+      }
 
       showToast(
-        'New Task Dispatcher Ready',
-        `Pre-populated 'Pipeline Task #${sampleNum}' (${nextType}). Configure priority and click Enqueue Task.`,
-        'info',
-        { label: 'Enqueue Now', onClick: () => handleDispatch() }
+        'New Task Dialog Opened',
+        `Pre-populated 'Pipeline Task #${sampleNum}' (${nextType}). Configure options and click Enqueue Task.`,
+        'info'
       );
+    }
+
+    function closeNewTaskModal() {
+      const modal = document.getElementById('new-task-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function handleNewTaskBackdropClick(e) {
+      if (e.target.id === 'new-task-modal') closeNewTaskModal();
+    }
+
+    function toggleDispatcher() {
+      openNewTaskModal();
+    }
+
+    async function handleModalDispatch(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const btn = document.getElementById('modal-submit-btn');
+      const fb = document.getElementById('modal-dispatch-feedback');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Dispatching to Cluster...';
+      }
+      if (fb) {
+        fb.style.display = 'block';
+        fb.style.background = 'rgba(59, 130, 246, 0.12)';
+        fb.style.border = '1px solid rgba(59, 130, 246, 0.35)';
+        fb.style.color = '#93C5FD';
+        fb.innerHTML = '<strong>Submitting task to cluster...</strong>';
+      }
+
+      let token = await ensureAuth();
+      let title = (document.getElementById('modal-task-title').value || '').trim();
+      if (!title) {
+        title = 'Quick Task #' + Math.floor(1000 + Math.random() * 9000);
+      }
+      const task_type = document.getElementById('modal-task-type').value;
+      const priority = parseInt(document.getElementById('modal-task-priority').value, 10);
+      const delay = parseInt(document.getElementById('modal-task-delay').value, 10) || 0;
+      const webhook = (document.getElementById('modal-task-webhook').value || '').trim() || null;
+      const dedupCheckbox = document.getElementById('modal-task-dedup');
+      const preventDuplicates = dedupCheckbox ? dedupCheckbox.checked : false;
+
+      try {
+        const payloadBody = {
+          title: title,
+          task_type: task_type,
+          priority: priority,
+          delay_seconds: delay,
+          prevent_duplicates: preventDuplicates,
+          payload: { timestamp: Date.now() }
+        };
+        if (webhook) payloadBody.webhook_url = webhook;
+
+        let res = await fetch(getApiUrl('/api/v1/tasks'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payloadBody)
+        });
+
+        if (res.status === 401) {
+          token = await ensureAuth(true);
+          res = await fetch(getApiUrl('/api/v1/tasks'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payloadBody)
+          });
+        }
+
+        if (res.ok) {
+          const createdTask = await res.json().catch(() => null);
+          if (btn) btn.innerText = 'Enqueued Successfully';
+
+          if (createdTask) {
+            allTasks.unshift(createdTask);
+            applyFiltersAndRender();
+
+            showToast(
+              'Task Enqueued Successfully',
+              `[${createdTask.id.slice(0, 8)}] "${createdTask.title}" (${createdTask.task_type}, P${createdTask.priority}). Status: ${createdTask.status}.`,
+              'success'
+            );
+
+            if (fb) {
+              const startProcessingBtnHtml = currentExecutionMode === 'manual'
+                ? `<button type="button" class="btn btn-xs btn-success" onclick="startPriorityProcessing(); closeNewTaskModal();" style="background:#10B981;">Start Processing</button>`
+                : '';
+
+              fb.style.display = 'block';
+              fb.style.background = 'rgba(16, 185, 129, 0.12)';
+              fb.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+              fb.style.color = '#34D399';
+              fb.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                  <div>
+                    <div style="font-weight:700; font-size:0.95rem; color:#FFFFFF; margin-bottom:4px;">
+                      Task Accepted (Status: <span id="modal-fb-status">${createdTask.status}</span>)
+                    </div>
+                    <div style="color:#A7F3D0; font-size:0.85rem; margin-bottom:4px;">
+                      <strong>${createdTask.title}</strong> [${createdTask.task_type}] &bull; Priority P${createdTask.priority}
+                    </div>
+                    <div style="font-family:monospace; font-size:0.75rem; color:#94A3B8;">
+                      Task ID: ${createdTask.id} &bull; Trace: ${createdTask.trace_id || 'N/A'}
+                    </div>
+                    <div id="modal-fb-result" style="margin-top:6px; font-size:0.8rem; color:#38BDF8; font-family:monospace;">
+                      ${currentExecutionMode === 'manual' ? 'Staged in queue. Tap Start Processing to execute.' : 'Worker executing task in fleet...'}
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:8px; align-self:flex-start; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-xs btn-primary" onclick="closeNewTaskModal(); openTaskModal('${createdTask.id}');">Inspect</button>
+                    ${startProcessingBtnHtml}
+                  </div>
+                </div>
+              `;
+
+              pollModalTaskResult(createdTask.id);
+            }
+          }
+          fetchTasks();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          let errMsg = (res.status === 409)
+            ? 'Duplicate Task Blocked (409 Conflict): ' + (errData.detail || 'An active task with this title exists.')
+            : 'Task dispatch failed (' + res.status + '): ' + (errData.detail || 'Service temporarily unavailable.');
+          showToast('Dispatch Conflict', errMsg, 'error');
+          if (fb) {
+            fb.style.display = 'block';
+            fb.style.background = 'rgba(239, 68, 68, 0.15)';
+            fb.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            fb.style.color = '#FCA5A5';
+            fb.innerHTML = `<strong>Error:</strong> ${errMsg}`;
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Enqueue Task to Cluster';
+          }
+        }
+      } catch (err) {
+        showToast('Dispatch Error', err.message, 'error');
+        if (fb) {
+          fb.style.display = 'block';
+          fb.style.background = 'rgba(239, 68, 68, 0.15)';
+          fb.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+          fb.style.color = '#FCA5A5';
+          fb.innerHTML = `<strong>Error:</strong> ${err.message}`;
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Enqueue Task to Cluster';
+        }
+      }
+    }
+
+    function pollModalTaskResult(taskId) {
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        await fetchTasks();
+        const t = allTasks.find(x => x.id === taskId);
+        if (t) {
+          const statusEl = document.getElementById('modal-fb-status');
+          const resEl = document.getElementById('modal-fb-result');
+          if (statusEl) statusEl.innerText = t.status;
+          if (t.status === 'SUCCESS') {
+            if (resEl) {
+              resEl.style.color = '#34D399';
+              resEl.innerHTML = `<strong>Result Returned:</strong> <code>${JSON.stringify(t.result || { status: 'SUCCESS' })}</code>`;
+            }
+            clearInterval(interval);
+          } else if (t.status === 'FAILED' || t.status === 'DEAD_LETTERED') {
+            if (resEl) {
+              resEl.style.color = '#F87171';
+              resEl.innerHTML = `<strong>Execution Failed:</strong> ${t.error_message || 'Task failed'}`;
+            }
+            clearInterval(interval);
+          }
+        }
+        if (attempts >= 30) clearInterval(interval);
+      }, 350);
     }
 
     function handleSearch(val) {
@@ -999,7 +1258,11 @@
     }
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeTaskModal();
+      if (e.key === 'Escape') {
+        closeTaskModal();
+        closeNewTaskModal();
+        closeCsvExportModal();
+      }
     });
 
     function copyModalField(elementId, btn) {
