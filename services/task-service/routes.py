@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -156,8 +156,11 @@ async def create_task(
     if req.idempotency_key:
         await store_idempotency(req.idempotency_key, task_id)
 
-    # 3. Publish to RabbitMQ only if not blocked by DAG or scheduled delay
-    if initial_status == TaskStatus.QUEUED:
+    # 3. Publish to RabbitMQ only if not blocked by DAG or scheduled delay, and mode is auto
+    from pkg.redis_client import get_execution_mode
+    current_mode = await get_execution_mode()
+
+    if initial_status == TaskStatus.QUEUED and current_mode == "auto":
         task_message = {
             "id": task.id,
             "user_id": task.user_id,
@@ -181,6 +184,9 @@ async def create_task(
             )
         except Exception as e:
             logger.warning(f"RabbitMQ publish deferred/unavailable: {e}. Task safely stored in database.")
+    elif initial_status == TaskStatus.QUEUED:
+        logger.info(f"Task {task.id} stored in database in manual/staged mode (Priority {task.priority}). Awaiting Start Processing trigger.")
+
 
     stmt = select(Task).options(selectinload(Task.attempts)).where(Task.id == task_id)
     created_task = (await db.execute(stmt)).scalar_one()
@@ -598,3 +604,53 @@ async def retry_task(
 
     logger.info(f"Task {task_id} manually re-queued for execution")
     return task
+
+
+@router.get("/execution-mode")
+async def get_execution_mode_endpoint(db: AsyncSession = Depends(get_db_session)):
+    """Returns current task processing mode ('manual' or 'auto') and queued count."""
+    from pkg.redis_client import get_execution_mode
+    mode = await get_execution_mode()
+    stmt = select(func.count(Task.id)).where(Task.status == TaskStatus.QUEUED)
+    queued_count = (await db.execute(stmt)).scalar() or 0
+    return {"mode": mode, "queued_count": queued_count}
+
+
+@router.post("/execution-mode")
+async def set_execution_mode_endpoint(request: Request):
+    """Switches task processing mode between 'manual' (batch staging) and 'auto' (instant)."""
+    from pkg.redis_client import set_execution_mode
+    try:
+        body = await request.json()
+        new_mode = body.get("mode", "manual")
+    except Exception:
+        new_mode = "manual"
+    saved_mode = await set_execution_mode(new_mode)
+    return {"mode": saved_mode, "status": "updated"}
+
+
+@router.post("/start-processing")
+async def start_processing_endpoint(db: AsyncSession = Depends(get_db_session)):
+    """
+    Triggers execution of all currently QUEUED tasks strictly in Priority Order (P10 -> P1).
+    Tasks are processed sequentially with visual pacing to clearly demonstrate priority scheduling.
+    """
+    from services.worker.main import process_priority_queue
+
+    stmt = select(Task).where(Task.status == TaskStatus.QUEUED).order_by(Task.priority.desc(), Task.created_at.asc())
+    queued_tasks = (await db.execute(stmt)).scalars().all()
+
+    if not queued_tasks:
+        return {"status": "idle", "message": "No tasks currently waiting in the queue.", "queued_count": 0}
+
+    # Launch priority execution in background task
+    asyncio.create_task(process_priority_queue())
+
+    sequence = [{"id": t.id, "title": t.title, "priority": t.priority} for t in queued_tasks]
+    return {
+        "status": "started",
+        "message": f"Started processing {len(queued_tasks)} tasks strictly in descending priority order (P10 -> P1).",
+        "queued_count": len(queued_tasks),
+        "priority_order": sequence,
+    }
+

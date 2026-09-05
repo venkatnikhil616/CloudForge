@@ -117,3 +117,32 @@ async def check_redis_health() -> bool:
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
         return False
+
+
+_local_execution_mode: str = "manual"
+
+
+async def get_execution_mode() -> str:
+    """Returns current task execution mode: 'manual' (default) or 'auto'."""
+    global _local_execution_mode
+    try:
+        client = get_redis_client()
+        val = await client.get("cloudtask:execution_mode")
+        if val:
+            return str(val)
+    except Exception:
+        pass
+    return _local_execution_mode
+
+
+async def set_execution_mode(mode: str) -> str:
+    """Sets task execution mode: 'manual' or 'auto'."""
+    global _local_execution_mode
+    _local_execution_mode = "auto" if mode.lower() == "auto" else "manual"
+    try:
+        client = get_redis_client()
+        await client.set("cloudtask:execution_mode", _local_execution_mode)
+    except Exception:
+        pass
+    return _local_execution_mode
+

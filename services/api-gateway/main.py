@@ -465,6 +465,8 @@ async def real_time_dashboard():
       <div class="nav-links">
         <a href="/" class="btn btn-secondary">← Portal</a>
         <a href="/docs" class="btn btn-secondary">📖 API Docs</a>
+        <button onclick="toggleExecutionMode()" class="btn btn-secondary" id="mode-toggle-btn" title="Toggle between manual batch staging and instant auto-dispatch" style="border: 1px solid #3B82F6; color: #93C5FD;">⚙️ Mode: <span id="mode-badge" style="font-weight:700; color:#38BDF8;">Manual (Staged)</span></button>
+        <button onclick="startPriorityProcessing()" class="btn btn-success" id="start-btn" style="background:#10B981; box-shadow:0 0 14px rgba(16,185,129,0.4); font-weight:700; padding:8px 16px;">▶️ Start Processing (<span id="start-count">0</span>)</button>
         <button onclick="exportTasksCsv()" class="btn btn-secondary" id="export-btn">📥 Export CSV</button>
         <button onclick="toggleDispatcher()" class="btn btn-primary" id="toggle-dispatch-btn">➕ New Task</button>
         <button onclick="fetchTasks()" class="btn btn-secondary" id="refresh-btn">🔄</button>
@@ -472,8 +474,8 @@ async def real_time_dashboard():
     </div>
 
     <!-- Cluster Fleet Summary Banner -->
-    <div class="cluster-banner">
-      <div><strong>Cluster Nodes:</strong> 2 Distributed Workers Active | <strong>Broker:</strong> RabbitMQ Priority Queue | <strong>Mutex:</strong> Redis Leases</div>
+    <div class="cluster-banner" id="status-banner">
+      <div id="mode-guidance-text"><strong>⏸️ Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>▶️ Start Processing</strong> to execute in priority order (P10 ➔ P1).</div>
       <div id="filter-count-badge" style="font-weight:600;">Showing 0 tasks</div>
     </div>
 
@@ -584,8 +586,11 @@ async def real_time_dashboard():
     <div class="kanban-grid">
       <div class="kanban-col" id="col-container-queued">
         <div class="col-header">
-          <span>🟡 QUEUED / PENDING</span>
-          <span id="badge-queued" class="tag">0</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>🟡 QUEUED / STAGED</span>
+            <span id="badge-queued" class="tag">0</span>
+          </div>
+          <button onclick="startPriorityProcessing()" class="btn btn-success btn-xs" id="col-start-btn" style="background:#10B981; padding:3px 8px; font-weight:700;" title="Run all queued tasks in Priority Order">▶️ Process Queue</button>
         </div>
         <div id="col-queued"></div>
       </div>
@@ -908,6 +913,9 @@ async def real_time_dashboard():
       document.getElementById('success-count').innerText = counts.success;
       document.getElementById('dlq-count').innerText = counts.dlq;
 
+      const startCountEl = document.getElementById('start-count');
+      if (startCountEl) startCountEl.innerText = counts.queued;
+
       document.getElementById('badge-queued').innerText = counts.queued;
       document.getElementById('badge-running').innerText = counts.running;
       document.getElementById('badge-success').innerText = counts.success;
@@ -1222,7 +1230,132 @@ async def real_time_dashboard():
       fetchTasks();
     }
 
+    let currentExecutionMode = 'manual';
+    let isProcessingQueue = false;
+
+    async function fetchExecutionMode() {
+      try {
+        let res = await fetch('/api/v1/tasks/execution-mode');
+        if (res.ok) {
+          const data = await res.json();
+          currentExecutionMode = data.mode || 'manual';
+          updateModeUI();
+        }
+      } catch (err) {
+        console.warn('Execution mode check:', err);
+      }
+    }
+
+    function updateModeUI() {
+      const badge = document.getElementById('mode-badge');
+      const guidance = document.getElementById('mode-guidance-text');
+      if (currentExecutionMode === 'auto') {
+        if (badge) {
+          badge.innerText = 'Auto-Start ⚡';
+          badge.style.color = '#34D399';
+        }
+        if (guidance) {
+          guidance.innerHTML = '<strong>⚡ Auto-Start Mode:</strong> Tasks execute automatically in background as soon as they are submitted.';
+        }
+      } else {
+        if (badge) {
+          badge.innerText = 'Manual (Staged) ⏸️';
+          badge.style.color = '#38BDF8';
+        }
+        if (guidance) {
+          guidance.innerHTML = '<strong>⏸️ Manual Batch Mode:</strong> Enter multiple tasks below with different priorities. They wait in queue until you tap <strong>▶️ Start Processing</strong> to execute in priority order (P10 ➔ P1).';
+        }
+      }
+    }
+
+    async function toggleExecutionMode() {
+      const targetMode = currentExecutionMode === 'manual' ? 'auto' : 'manual';
+      const btn = document.getElementById('mode-toggle-btn');
+      if (btn) btn.disabled = true;
+      try {
+        let res = await fetch('/api/v1/tasks/execution-mode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: targetMode })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentExecutionMode = data.mode || targetMode;
+          updateModeUI();
+        }
+      } catch (err) {
+        console.error('Toggle execution mode error:', err);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function startPriorityProcessing() {
+      if (isProcessingQueue) return;
+
+      const btn = document.getElementById('start-btn');
+      const colBtn = document.getElementById('col-start-btn');
+      const queuedCount = parseInt(document.getElementById('queued-count').innerText || '0');
+
+      if (queuedCount === 0) {
+        alert('No tasks are currently queued! Enqueue 2 or 3 tasks with different priorities first (e.g. Priority 2, Priority 10), then tap Start Processing to watch priority scheduling in action.');
+        return;
+      }
+
+      isProcessingQueue = true;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Processing (P10 ➔ P1)...';
+        btn.style.background = '#F59E0B';
+      }
+      if (colBtn) {
+        colBtn.disabled = true;
+        colBtn.innerText = '⏳ Processing...';
+      }
+
+      try {
+        await fetch('/api/v1/tasks/start-processing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Fast polling for 12 seconds to visibly animate transitions from QUEUED -> RUNNING -> SUCCESS
+        let polls = 0;
+        const fastPoll = setInterval(async () => {
+          await fetchTasks();
+          polls++;
+          const remaining = parseInt(document.getElementById('queued-count').innerText || '0');
+          if (remaining === 0 || polls >= 15) {
+            clearInterval(fastPoll);
+            isProcessingQueue = false;
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '▶️ Start Processing (<span id="start-count">' + remaining + '</span>)';
+              btn.style.background = '#10B981';
+            }
+            if (colBtn) {
+              colBtn.disabled = false;
+              colBtn.innerText = '▶️ Process Queue';
+            }
+          }
+        }, 750);
+      } catch (err) {
+        console.error('Failed to start processing:', err);
+        isProcessingQueue = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '▶️ Start Processing (<span id="start-count">' + queuedCount + '</span>)';
+          btn.style.background = '#10B981';
+        }
+        if (colBtn) {
+          colBtn.disabled = false;
+          colBtn.innerText = '▶️ Process Queue';
+        }
+      }
+    }
+
     // Initial fetch and 2.5-second live polling loop
+    fetchExecutionMode();
     fetchTasks();
     setInterval(fetchTasks, 2500);
   </script>

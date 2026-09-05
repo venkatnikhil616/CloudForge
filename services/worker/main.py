@@ -64,6 +64,12 @@ async def poll_and_execute_tasks():
 
     from pkg.database import AsyncSessionLocal
     from pkg.models.task import Task, TaskStatus
+    from pkg.redis_client import get_execution_mode
+
+    # In manual mode, tasks wait in the queue until the user taps "Start Processing"
+    mode = await get_execution_mode()
+    if mode != "auto":
+        return
 
     try:
         async with AsyncSessionLocal() as session:
@@ -92,6 +98,60 @@ async def poll_and_execute_tasks():
                 asyncio.create_task(execute_task(task_dict))
     except Exception as e:
         logger.warning(f"Database polling check: {e}")
+
+
+async def process_priority_queue() -> int:
+    """
+    Executes all currently QUEUED tasks strictly in Priority Order (P10 -> P1).
+    Provides visual progress pacing between tasks for clear demo visibility.
+    """
+    from sqlalchemy import select
+    from pkg.database import AsyncSessionLocal
+    from pkg.models.task import Task, TaskStatus
+
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(Task)
+                .where(Task.status == TaskStatus.QUEUED)
+                .order_by(Task.priority.desc(), Task.created_at.asc())
+            )
+            tasks = (await session.execute(stmt)).scalars().all()
+            if not tasks:
+                return 0
+
+            task_list = [
+                {
+                    "id": t.id,
+                    "user_id": t.user_id,
+                    "title": t.title,
+                    "task_type": t.task_type,
+                    "payload": t.payload or {},
+                    "priority": t.priority,
+                    "max_retries": t.max_retries,
+                    "current_attempt": t.current_attempt,
+                    "timeout_seconds": t.timeout_seconds,
+                    "trace_id": t.trace_id,
+                    "webhook_url": t.webhook_url,
+                    "delay_seconds": t.delay_seconds,
+                }
+                for t in tasks
+            ]
+
+        logger.info(f"Starting manual priority dispatch for {len(task_list)} tasks (P10 -> P1)...")
+        for task_dict in task_list:
+            try:
+                await execute_task(task_dict)
+                # Pacing between tasks so UI updates reflect priority progression
+                await asyncio.sleep(0.8)
+            except Exception as ex:
+                logger.error(f"Error processing priority task {task_dict['id']}: {ex}")
+
+        return len(task_list)
+    except Exception as e:
+        logger.error(f"process_priority_queue error: {e}")
+        return 0
+
 
 
 async def run_worker():
