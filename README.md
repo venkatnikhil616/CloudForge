@@ -42,18 +42,29 @@ The built-in Web Operations Dashboard (`/dashboard`) provides end-to-end task li
    - **Completed & DLQ**: Real-time counters of completed executions and failed tasks routed to the Dead Letter Queue.
    - **Performance Stats**: Continuous calculation of average task execution latency and success rate percentages.
 
-2. **⚡ Quick Task Dispatcher**:
+2. **Quick Task Dispatcher & Duplicate Guard**:
    - Easily enqueue background jobs directly from the dashboard.
-   - Configurable **Task Title**, **Task Type** (`data_sync`, `report_generation`, `email_dispatch`, `heavy_compute`), **Priority (1-10)**, and JSON Payload.
-   - Auto-fills default task title if left blank.
+   - **Real-Time Pre-Flight Duplicate Detection**: Dynamically alerts if a matching active task is already in the queue as the title is typed.
+   - **Duplicate Detection Guard Toggle**: Automatically rejects duplicate active tasks (`QUEUED`, `PENDING`, `RUNNING`) with HTTP 409 Conflict when enabled; toggleable to allow intentional duplicates.
+   - Configurable **Task Title**, **Handler Type**, **Priority (1-10)**, Delay Seconds, and Webhook Callback URL.
 
-3. **📥 One-Click CSV Audit Export**:
-   - Click **Export CSV** to immediately stream full operational task history.
-   - Features dual fallback: streams via the authenticated backend API endpoint (`/api/v1/tasks/export?format=csv`) and seamlessly falls back to client-side data compilation if offline.
+3. **Manual Batch Staging & Priority Execution ("Start Process")**:
+   - Operators can enqueue multiple tasks in staged mode without immediate execution.
+   - Clicking **Start Process** initiates sequential execution strictly ordered by priority (P10 Critical down to P1 Low) with paced worker processing to ensure complete visibility.
 
-4. **🔄 Dead-Letter Queue (DLQ) & 1-Click Replay**:
+4. **Visual Duplicate Tags & Duplicates-Only Filter**:
+   - Tasks with matching duplicates across the fleet display an amber `Duplicate (<count>)` badge on Kanban cards.
+   - The toolbar features an instant **Duplicates Only** filter alongside type and priority filters.
+
+5. **Clear History Action**:
+   - One-click **Clear History** button instantly purges completed and failed tasks from the dashboard to maintain optimal UI responsiveness.
+
+6. **One-Click CSV Audit Export**:
+   - Click **Export CSV** to immediately stream full operational task history with dual fallback (backend streaming + client-side data fallback).
+
+7. **Dead-Letter Queue (DLQ) & 1-Click Replay**:
    - Inspect failed tasks with full failure reasons and execution attempt counters.
-   - Click **Replay All** to redrive all failed tasks back into the primary worker priority queues with exponential backoff reset.
+   - Click **Replay All** to redrive all failed tasks back into worker priority queues with exponential backoff reset.
 
 ---
 
@@ -107,11 +118,13 @@ The built-in Web Operations Dashboard (`/dashboard`) provides end-to-end task li
 ## ✨ Key Features
 
 - 🔒 **Stateless JWT Authentication**: Secure password hashing with bcrypt, JWT token issuing, verification, and role-based access control.
-- ⚡ **Priority-Based Task Queuing**: 10 levels of task priority (1 Low to 10 Critical) dispatched via RabbitMQ.
+- 🛡️ **Active Duplicate Task Detection**: Active collision detection rejecting duplicate active submissions (`QUEUED`, `PENDING`, `RUNNING`) with `HTTP 409 Conflict`, pre-flight checking (`POST /api/v1/tasks/check-duplicate`), and cluster scanner (`GET /api/v1/tasks/duplicates`).
+- ⚡ **Priority-Based Task Queuing & Batch Staging**: 10 levels of task priority (1 Low to 10 Critical) dispatched via RabbitMQ, with manual batch staging and sequential priority execution ("Start Process").
 - 🛡️ **At-Least-Once Delivery & Idempotency**: Redis distributed mutex locking (`Redlock` pattern) combined with PostgreSQL unique constraints prevent duplicate execution.
 - 🔁 **Controlled Exponential Backoff & DLQ**: Configurable retry policies ($5 \times 3^{\text{attempt}}$ seconds) with automatic escalation to Dead Letter Queue (`cloudtask.tasks.dlq`).
 - ⏱️ **Distributed Scheduler**: Cron-based and interval job execution with Redis leader election to prevent duplicate task emission across replicas.
 - 📬 **Event-Driven Notifications**: Asynchronous event dispatching for task completions, failures, and system alerts.
+- 🧹 **State Cleanup & Clear History**: Instant one-click purging of finished and dead-lettered tasks to maintain high UI responsiveness.
 - ☸️ **Cloud-Native Kubernetes & Helm**: Full declarative manifests, StatefulSets with PVCs, HPA autoscaling, NetworkPolicies, and Helm charts.
 - 🚀 **GitOps Deployment**: Declarative sync and automated deployments via Argo CD.
 - 📊 **End-to-End Observability**: Custom Prometheus metrics exporter, structured JSON logging with correlation IDs for Loki, and pre-configured Grafana dashboards.
@@ -145,17 +158,38 @@ curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks \
     "title": "Batch Data Ingestion",
     "task_type": "data_sync",
     "priority": 8,
+    "prevent_duplicates": true,
     "payload": {"records": 5000, "source": "s3://datasets/daily.parquet"}
   }' | jq .
 ```
 
-### 4. Query Task Status
+### 4. Pre-Flight Duplicate Verification
+```bash
+curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/check-duplicate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"title": "Batch Data Ingestion", "task_type": "data_sync"}' | jq .
+```
+
+### 5. Trigger Staged Priority Execution
+```bash
+curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/start-processing \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### 6. Query Task Status
 ```bash
 curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/<TASK_ID>" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-### 5. Export Task Audit History to CSV
+### 7. Clear Finished History
+```bash
+curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/clear-history \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+### 8. Export Task Audit History to CSV
 ```bash
 curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/export?format=csv" \
   -H "Authorization: Bearer $TOKEN" -o tasks_audit_log.csv
@@ -163,9 +197,9 @@ curl -s -X GET "https://cloudtask-platform.onrender.com/api/v1/tasks/export?form
 head -n 5 tasks_audit_log.csv
 ```
 
-### 6. Replay Dead Letter Queue (DLQ)
+### 9. Replay Dead Letter Queue (DLQ)
 ```bash
-curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/dlq/replay \
+curl -s -X POST https://cloudtask-platform.onrender.com/api/v1/tasks/dlq/replay-all \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 

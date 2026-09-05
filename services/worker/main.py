@@ -106,6 +106,7 @@ async def process_priority_queue() -> int:
     Provides visual progress pacing between tasks for clear demo visibility.
     """
     from sqlalchemy import select
+
     from pkg.database import AsyncSessionLocal
     from pkg.models.task import Task, TaskStatus
 

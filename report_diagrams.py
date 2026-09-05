@@ -1,5 +1,6 @@
-from reportlab.graphics.shapes import Drawing, Rect, String, Line, Polygon, Circle, Group
+from reportlab.graphics.shapes import Circle, Drawing, Line, Polygon, Rect, String
 from reportlab.lib.colors import HexColor
+
 
 def arrow(d, x1, y1, x2, y2, color="#64748B", width=1.2, head_len=5):
     d.add(Line(x1, y1, x2, y2, strokeColor=HexColor(color), strokeWidth=width))
@@ -277,10 +278,10 @@ def fig_dashboard_mockup():
     
     # 4 metric cards
     cards = [
-        (15, "Pending", "0", "#94A3B8"),
-        (140, "Processing", "1", "#38BDF8"),
-        (265, "Completed", "42", "#4ADE80"),
-        (390, "DLQ / Failed", "0", "#F87171")
+        (15, "Pending (Queued)", "0", "#94A3B8"),
+        (140, "Running in Fleet", "1", "#38BDF8"),
+        (265, "Finished Success", "42", "#4ADE80"),
+        (390, "Dead Letter Queue", "0", "#F87171")
     ]
     for x, label, val, col in cards:
         d.add(Rect(x, 70, 115, 38, fillColor=HexColor("#1E293B"), strokeColor=HexColor("#334155"), strokeWidth=1, rx=4, ry=4))
@@ -288,19 +289,26 @@ def fig_dashboard_mockup():
         d.add(String(x + 10, 78, val, fontName="Helvetica-Bold", fontSize=12, fillColor=HexColor(col)))
         
     # Quick actions bar
-    d.add(Rect(15, 25, 490, 36, fillColor=HexColor("#1E293B"), strokeColor=HexColor("#334155"), strokeWidth=1, rx=4, ry=4))
-    d.add(Rect(25, 31, 85, 24, fillColor=HexColor("#0284C7"), strokeColor=HexColor("#0369A1"), strokeWidth=1, rx=3, ry=3))
-    d.add(String(67, 41, "New Task", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+    d.add(Rect(15, 20, 490, 44, fillColor=HexColor("#1E293B"), strokeColor=HexColor("#334155"), strokeWidth=1, rx=4, ry=4))
     
-    d.add(Rect(120, 31, 85, 24, fillColor=HexColor("#10B981"), strokeColor=HexColor("#047857"), strokeWidth=1, rx=3, ry=3))
-    d.add(String(162, 41, "Export CSV", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+    d.add(Rect(22, 37, 80, 21, fillColor=HexColor("#0284C7"), strokeColor=HexColor("#0369A1"), strokeWidth=1, rx=3, ry=3))
+    d.add(String(62, 45, "Enqueue Task", fontName="Helvetica-Bold", fontSize=7, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+
+    d.add(Rect(108, 37, 88, 21, fillColor=HexColor("#10B981"), strokeColor=HexColor("#047857"), strokeWidth=1, rx=3, ry=3))
+    d.add(String(152, 45, "Start Process", fontName="Helvetica-Bold", fontSize=7, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+
+    d.add(Rect(202, 37, 80, 21, fillColor=HexColor("#64748B"), strokeColor=HexColor("#475569"), strokeWidth=1, rx=3, ry=3))
+    d.add(String(242, 45, "Clear History", fontName="Helvetica-Bold", fontSize=7, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+
+    d.add(Rect(288, 37, 76, 21, fillColor=HexColor("#3B82F6"), strokeColor=HexColor("#1D4ED8"), strokeWidth=1, rx=3, ry=3))
+    d.add(String(326, 45, "Export CSV", fontName="Helvetica-Bold", fontSize=7, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+
+    d.add(Rect(370, 37, 74, 21, fillColor=HexColor("#EF4444"), strokeColor=HexColor("#B91C1C"), strokeWidth=1, rx=3, ry=3))
+    d.add(String(407, 45, "Replay All", fontName="Helvetica-Bold", fontSize=7, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
+
+    d.add(String(260, 26, "Deduplication Guard: Active | Filter: Duplicates Only | Zero Emojis", fontName="Helvetica", fontSize=6.5, fillColor=HexColor("#F59E0B"), textAnchor="middle"))
     
-    d.add(Rect(215, 31, 85, 24, fillColor=HexColor("#EF4444"), strokeColor=HexColor("#B91C1C"), strokeWidth=1, rx=3, ry=3))
-    d.add(String(257, 41, "Replay All (DLQ)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=HexColor("#FFFFFF"), textAnchor="middle"))
-    
-    d.add(String(320, 41, "Realtime Polling (3s interval)", fontName="Helvetica", fontSize=7.5, fillColor=HexColor("#94A3B8")))
-    
-    d.add(String(260, 8, "Figure 28.1: Live Cloud Operations Dashboard User Interface and Task Dispatch Engine", fontName="Helvetica-Oblique", fontSize=7.5, fillColor=HexColor("#94A3B8"), textAnchor="middle"))
+    d.add(String(260, 6, "Figure 28.1: Live Cloud Operations Dashboard User Interface and Task Dispatch Engine", fontName="Helvetica-Oblique", fontSize=7.5, fillColor=HexColor("#94A3B8"), textAnchor="middle"))
     return d
 
 print("report_diagrams.py loaded and verified!")

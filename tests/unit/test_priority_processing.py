@@ -1,6 +1,8 @@
 import pytest
+
 from pkg.redis_client import get_execution_mode, set_execution_mode
 from services.worker.main import process_priority_queue
+
 
 @pytest.mark.asyncio
 async def test_execution_mode_toggling():
@@ -27,6 +29,7 @@ async def test_priority_processing_empty_queue():
 @pytest.mark.asyncio
 async def test_clear_history_endpoint_empty():
     import importlib.util
+
     from pkg.database import AsyncSessionLocal
 
     spec = importlib.util.spec_from_file_location("task_routes", "services/task-service/routes.py")

@@ -699,8 +699,9 @@ async def clear_history_endpoint(db: AsyncSession = Depends(get_db_session)):
     Clears all historical tasks with status SUCCESS or CANCELLED from the database.
     Also cascades deletions to associated worker attempt records.
     """
-    from pkg.models.attempt import TaskAttempt
     from sqlalchemy import delete
+
+    from pkg.models.attempt import TaskAttempt
 
     stmt = select(Task.id).where(Task.status.in_([TaskStatus.SUCCESS, TaskStatus.CANCELLED]))
     task_ids = (await db.execute(stmt)).scalars().all()
