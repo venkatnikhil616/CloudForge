@@ -1866,7 +1866,7 @@ async def real_time_dashboard():
         }
         if (res.ok) {
           csvContent = await res.text();
-          const lines = csvContent.trim().split('\n').filter(l => l.trim().length > 0);
+          const lines = csvContent.trim().split(String.fromCharCode(10)).filter(l => l.trim().length > 0);
           taskCount = Math.max(0, lines.length - 1);
         } else {
           const clientData = buildClientSideCsv();
@@ -1924,7 +1924,7 @@ async def real_time_dashboard():
         t.delay_seconds || 0,
         t.created_at || ''
       ]);
-      const content = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const content = [headers.join(','), ...rows.map(r => r.join(','))].join(String.fromCharCode(10));
       return { content: content, count: (allTasks || []).length };
     }
 
@@ -1970,7 +1970,7 @@ async def real_time_dashboard():
       const modal = document.getElementById('csv-export-modal');
       const preview = document.getElementById('csv-export-preview');
       const countEl = document.getElementById('csv-export-count');
-      if (countEl) countEl.innerText = count !== undefined ? count : (csvText ? Math.max(0, csvText.trim().split('\n').length - 1) : 0);
+      if (countEl) countEl.innerText = count !== undefined ? count : (csvText ? Math.max(0, csvText.trim().split(String.fromCharCode(10)).length - 1) : 0);
       if (preview) preview.innerText = csvText || '(No tasks recorded)';
       if (modal) {
         modal.style.display = 'flex';
