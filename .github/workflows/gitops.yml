@@ -1,0 +1,28 @@
+name: GitOps Deployment Trigger
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'deployments/**'
+
+jobs:
+  validate-helm:
+    name: Validate Helm & K8s Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Lint Helm Chart
+        run: |
+          helm lint deployments/helm/cloudtask
+
+      - name: Dry-run Helm Template
+        run: |
+          helm template cloudtask deployments/helm/cloudtask > /dev/null

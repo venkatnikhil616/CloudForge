@@ -1,0 +1,75 @@
+global:
+  environment: production
+  imageRegistry: docker.io/cloudtask
+
+apiGateway:
+  replicaCount: 2
+  image:
+    repository: cloudtask/api-gateway
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+authService:
+  replicaCount: 2
+  image:
+    repository: cloudtask/auth-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+taskService:
+  replicaCount: 2
+  image:
+    repository: cloudtask/task-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    requests:
+      cpu: 150m
+      memory: 192Mi
+    limits:
+      cpu: 800m
+      memory: 512Mi
+
+worker:
+  replicaCount: 3
+  image:
+    repository: cloudtask/worker
+    tag: latest
+  concurrency: 10
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+
+ingress:
+  enabled: true
+  className: nginx
+  host: cloudtask.local

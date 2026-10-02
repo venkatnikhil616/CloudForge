@@ -1,0 +1,57 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Task Throughput & Processing (Success vs Failures)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(worker_tasks_processed_total{status='success'}[1m])", "legendFormat": "Succeeded" },
+        { "expr": "rate(worker_tasks_failed_total[1m])", "legendFormat": "Failed" },
+        { "expr": "rate(worker_tasks_retried_total[1m])", "legendFormat": "Retried" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "title": "Active Workers & Concurrency",
+      "type": "stat",
+      "targets": [
+        { "expr": "worker_active_count", "legendFormat": "Active Workers" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "title": "API Gateway Request Latency (p95)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(gateway_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95 Latency (s)" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "title": "Notifications Dispatched",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(notifications_sent_total[1m])", "legendFormat": "Dispatched" }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "title": "CloudTask Platform Overview",
+  "version": 1
+}

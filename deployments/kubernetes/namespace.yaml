@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudtask
+  labels:
+    app.kubernetes.io/name: cloudtask
+    app.kubernetes.io/part-of: cloudtask-platform
