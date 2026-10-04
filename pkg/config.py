@@ -5,17 +5,31 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _normalize_database_url(raw_url: str) -> str:
+    if not raw_url:
+        return raw_url
+    if raw_url.startswith("postgres://"):
+        raw_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+asyncpg://"):
+        raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if "sslmode=require" in raw_url:
+        raw_url = raw_url.replace("sslmode=require", "ssl=require")
+    # Fix Render internal short hostname if missing external domain (.oregon-postgres.render.com)
+    import re
+    raw_url = re.sub(r"@([a-z0-9_.-]+:[^@]+@)?(dpg-[a-z0-9]+-[a-z0-9]+)([:/])", r"@\1\2.oregon-postgres.render.com\3", raw_url)
+    if "@dpg-" in raw_url and ".render.com" not in raw_url:
+        raw_url = re.sub(r"@(dpg-[a-z0-9]+-[a-z0-9]+)([:/])", r"@\1.oregon-postgres.render.com\2", raw_url)
+    # Fix cut-off database name if truncated
+    if raw_url.endswith("/cloudtask_db_"):
+        raw_url = raw_url + "c77p"
+    return raw_url
+
+
 def _resolve_database_url() -> str:
     """Ensures PostgreSQL URL is formatted properly for asyncpg, or falls back to local SQLite."""
     raw_url = os.getenv("DATABASE_URL")
     if raw_url:
-        if raw_url.startswith("postgres://"):
-            raw_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
-        elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+asyncpg://"):
-            raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        if "sslmode=require" in raw_url:
-            raw_url = raw_url.replace("sslmode=require", "ssl=require")
-        return raw_url
+        return _normalize_database_url(raw_url)
 
     postgres_host = os.getenv("POSTGRES_HOST")
     if postgres_host:
@@ -47,13 +61,7 @@ class Settings(BaseSettings):
     @classmethod
     def format_database_url(cls, v: object) -> str:
         if isinstance(v, str) and v:
-            if v.startswith("postgres://"):
-                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
-            elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
-                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
-            if "sslmode=require" in v:
-                v = v.replace("sslmode=require", "ssl=require")
-            return v
+            return _normalize_database_url(v)
         return _resolve_database_url()
 
     # Redis

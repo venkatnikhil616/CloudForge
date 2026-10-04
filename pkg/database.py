@@ -4,19 +4,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
-from pkg.config import get_settings
+from pkg.config import _normalize_database_url, get_settings
 from pkg.logger import get_logger
 
 logger = get_logger("database")
 settings = get_settings()
 
-db_url = settings.DATABASE_URL
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
-elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+asyncpg://"):
-    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-if "sslmode=require" in db_url:
-    db_url = db_url.replace("sslmode=require", "ssl=require")
+db_url = _normalize_database_url(settings.DATABASE_URL)
 
 if db_url.startswith("sqlite"):
     engine = create_async_engine(

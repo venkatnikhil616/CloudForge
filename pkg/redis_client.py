@@ -45,32 +45,34 @@ async def distributed_lock(
     Acquires a distributed lock using Redis SETNX with expiration.
     Ensures safe idempotent task and scheduler execution.
     """
+    client = None
+    key = f"lock:{lock_key}"
+    acquired = False
+
     try:
         client = get_redis_client()
-        key = f"lock:{lock_key}"
-        acquired = False
-
         for _ in range(max_retries):
             # SET key 1 NX EX timeout
             if await client.set(key, "1", nx=True, ex=timeout_seconds):
                 acquired = True
                 break
             await asyncio.sleep(retry_interval)
+    except Exception as e:
+        logger.warning(f"Redis distributed lock unavailable: {e}. Falling back to single-node grant.")
+        acquired = True
 
-        if not acquired:
-            yield False
-            return
+    if not acquired:
+        yield False
+        return
 
-        try:
-            yield True
-        finally:
+    try:
+        yield True
+    finally:
+        if client is not None and acquired:
             try:
                 await client.delete(key)
             except Exception as e:
                 logger.warning(f"Error releasing lock {key}: {e}")
-    except Exception as e:
-        logger.warning(f"Redis distributed lock unavailable: {e}. Falling back to single-node grant.")
-        yield True
 
 
 async def check_idempotency(key: str) -> Optional[str]:
