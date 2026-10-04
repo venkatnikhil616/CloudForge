@@ -84,6 +84,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Database auto-setup: {e}")
 
     worker_task = None
+    sched_task = None
 
     async def gateway_worker_loop():
         try:
@@ -99,11 +100,28 @@ async def lifespan(app: FastAPI):
         except Exception as err:
             logger.warning(f"Gateway worker background loop: {err}")
 
+    async def gateway_scheduler_loop():
+        try:
+            from services.scheduler.main import process_due_schedules
+            while True:
+                await asyncio.sleep(5)
+                try:
+                    await process_due_schedules()
+                except Exception as sched_err:
+                    logger.warning(f"Gateway scheduler cycle warning: {sched_err}")
+        except asyncio.CancelledError:
+            pass
+        except Exception as err:
+            logger.warning(f"Gateway scheduler background loop: {err}")
+
     worker_task = asyncio.create_task(gateway_worker_loop())
+    sched_task = asyncio.create_task(gateway_scheduler_loop())
 
     yield
     if worker_task:
         worker_task.cancel()
+    if sched_task:
+        sched_task.cancel()
     if http_client:
         await http_client.aclose()
     logger.info("API Gateway shut down.")
