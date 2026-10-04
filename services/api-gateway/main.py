@@ -59,24 +59,27 @@ async def lifespan(app: FastAPI):
         from pkg.models import User
         from pkg.security import hash_password
 
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        async def init_db_schema():
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
 
-        async with AsyncSessionLocal() as session:
-            stmt = select(User).where(User.email == "admin@cloudtask.dev")
-            existing = (await session.execute(stmt)).scalar_one_or_none()
-            if not existing:
-                admin_user = User(
-                    id=str(uuid.uuid4()),
-                    email="admin@cloudtask.dev",
-                    hashed_password=hash_password("AdminSecurePass123!"),
-                    full_name="CloudTask Admin",
-                    role="admin",
-                    is_active=True,
-                )
-                session.add(admin_user)
-                await session.commit()
-                logger.info("Auto-initialized database and seeded admin user.")
+            async with AsyncSessionLocal() as session:
+                stmt = select(User).where(User.email == "admin@cloudtask.dev")
+                existing = (await session.execute(stmt)).scalar_one_or_none()
+                if not existing:
+                    admin_user = User(
+                        id=str(uuid.uuid4()),
+                        email="admin@cloudtask.dev",
+                        hashed_password=hash_password("AdminSecurePass123!"),
+                        full_name="CloudTask Admin",
+                        role="admin",
+                        is_active=True,
+                    )
+                    session.add(admin_user)
+                    await session.commit()
+                    logger.info("Auto-initialized database and seeded admin user.")
+
+        await asyncio.wait_for(init_db_schema(), timeout=5.0)
     except Exception as e:
         logger.warning(f"Database auto-setup: {e}")
 

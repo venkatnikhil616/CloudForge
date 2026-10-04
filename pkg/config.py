@@ -10,9 +10,11 @@ def _resolve_database_url() -> str:
     raw_url = os.getenv("DATABASE_URL")
     if raw_url:
         if raw_url.startswith("postgres://"):
-            return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            raw_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+asyncpg://"):
-            return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if "sslmode=require" in raw_url:
+            raw_url = raw_url.replace("sslmode=require", "ssl=require")
         return raw_url
 
     postgres_host = os.getenv("POSTGRES_HOST")
@@ -46,9 +48,11 @@ class Settings(BaseSettings):
     def format_database_url(cls, v: object) -> str:
         if isinstance(v, str) and v:
             if v.startswith("postgres://"):
-                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
             elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
-                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            if "sslmode=require" in v:
+                v = v.replace("sslmode=require", "ssl=require")
             return v
         return _resolve_database_url()
 
